@@ -8,7 +8,7 @@ from app.routers import auth, children, alerts, preferences, stats
 settings = get_settings()
 
 app = FastAPI(
-    title="OpenBark API",
+    title="SafeMail API",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -40,7 +40,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content={
-            "type": "https://api.openbark.com/errors/internal-error",
+            "type": "https://api.safemail.com/errors/internal-error",
             "title": "Internal Server Error",
             "status": 500,
             "detail": str(exc),

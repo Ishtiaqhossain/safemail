@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/openbark"
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/safemail"
     redis_url: str = "redis://localhost:6379/0"
 
     jwt_private_key_path: str = "./keys/private.pem"

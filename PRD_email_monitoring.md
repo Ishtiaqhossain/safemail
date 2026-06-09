@@ -1,6 +1,6 @@
 # PRD: AI-Powered Email Monitoring for Child Safety
 
-**Product:** OpenBark  
+**Product:** SafeMail  
 **Feature:** Email Monitoring & Smart Alerts  
 **Author:** Product Team  
 **Date:** 2026-06-08  

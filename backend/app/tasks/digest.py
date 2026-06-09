@@ -59,11 +59,11 @@ def send_parent_digest(self, parent_id: str):
         if not sections:
             return
 
-        html = "<h2>OpenBark Weekly Summary</h2>" + "".join(sections)
+        html = "<h2>SafeMail Weekly Summary</h2>" + "".join(sections)
         msg = Mail(
-            from_email="digest@openbark.com",
+            from_email="digest@safemail.com",
             to_emails=parent.email,
-            subject="Your OpenBark Weekly Summary",
+            subject="Your SafeMail Weekly Summary",
             html_content=html,
         )
         try:

@@ -168,7 +168,7 @@ def test_precision_recall_report(capsys):
     }
 
     print("\n" + "═" * 60)
-    print("  OpenBark Classifier Effectiveness Report")
+    print("  SafeMail Classifier Effectiveness Report")
     print("═" * 60)
     print(f"\n  Overall")
     print(f"  {'Recall (detection rate)':<30} {recall:.1%}  ({true_positives}/{total_dangerous} dangerous emails detected)")

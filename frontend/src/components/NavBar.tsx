@@ -11,7 +11,7 @@ export function NavBar() {
 
   return (
     <nav style={{ display: "flex", alignItems: "center", gap: 24, padding: "12px 24px", borderBottom: "1px solid #e5e7eb", background: "#fff" }}>
-      <span style={{ fontWeight: 700, fontSize: 18 }}>OpenBark</span>
+      <span style={{ fontWeight: 700, fontSize: 18 }}>SafeMail</span>
       <Link to="/dashboard">Dashboard</Link>
       <Link to="/alerts">Alerts</Link>
       <Link to="/settings">Settings</Link>

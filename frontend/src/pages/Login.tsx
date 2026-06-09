@@ -28,7 +28,7 @@ export default function Login() {
 
   return (
     <div style={{ maxWidth: 400, margin: "80px auto", padding: 24, border: "1px solid #e5e7eb", borderRadius: 8 }}>
-      <h1 style={{ marginBottom: 24 }}>OpenBark</h1>
+      <h1 style={{ marginBottom: 24 }}>SafeMail</h1>
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         <button onClick={() => setMode("login")} style={{ fontWeight: mode === "login" ? 700 : 400 }}>Login</button>
         <button onClick={() => setMode("register")} style={{ fontWeight: mode === "register" ? 700 : 400 }}>Register</button>

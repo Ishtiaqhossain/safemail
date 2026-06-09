@@ -5,7 +5,7 @@ from app.config import get_settings
 settings = get_settings()
 
 celery = Celery(
-    "openbark",
+    "safemail",
     broker=settings.redis_url,
     backend=settings.redis_url,
     include=["app.tasks.ingestion", "app.tasks.analysis", "app.tasks.digest"],

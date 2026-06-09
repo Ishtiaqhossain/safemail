@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from app.main import app
 from app.database import Base, get_db
 
-TEST_DB_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/openbark_test"
+TEST_DB_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/safemail_test"
 
 test_engine = create_async_engine(TEST_DB_URL, echo=False)
 TestSessionLocal = async_sessionmaker(test_engine, expire_on_commit=False)

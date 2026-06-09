@@ -1,6 +1,6 @@
 # Technical Specification: Email Monitoring MVP
 
-**Product:** OpenBark — Email Monitoring  
+**Product:** SafeMail — Email Monitoring  
 **Spec Version:** 1.0  
 **Date:** 2026-06-08  
 **Status:** Draft  
@@ -18,7 +18,7 @@
                      │ HTTPS / REST                │ FCM Push
 ┌────────────────────▼────────────────────────────▼───────────────┐
 │                       API GATEWAY (REST)                        │
-│                    api.openbark.com/v1                          │
+│                    api.safemail.com/v1                          │
 └──┬──────────────┬───────────────┬──────────────┬────────────────┘
    │              │               │              │
 ┌──▼───┐  ┌──────▼──────┐ ┌──────▼──────┐ ┌────▼──────────────┐
@@ -394,7 +394,7 @@ notify_parent(alert_id)
 
 **Alert email (SendGrid dynamic template):**
 ```
-Subject: [OpenBark] High Alert — Emma's Email
+Subject: [SafeMail] High Alert — Emma's Email
 
 Severity:  HIGH
 Category:  Personal Information Sharing
@@ -428,7 +428,7 @@ def send_weekly_digest(parent_id: str):
 
 ## 5. REST API Specification
 
-Base URL: `https://api.openbark.com/v1`  
+Base URL: `https://api.safemail.com/v1`  
 Auth: `Authorization: Bearer <access_token>` on all endpoints except `/auth/*`
 
 ### 5.1 Children
@@ -543,7 +543,7 @@ All errors follow RFC 7807 Problem Details:
 
 ```json
 {
-  "type": "https://api.openbark.com/errors/token-expired",
+  "type": "https://api.safemail.com/errors/token-expired",
   "title": "Gmail token expired",
   "status": 401,
   "detail": "The Gmail access token for this connection has expired. Please reconnect.",
@@ -630,8 +630,8 @@ Secrets Manager:
 Load Balancer: ALB → HTTPS (ACM cert), HTTP → 443 redirect
 
 S3:
-  - openbark-static: dashboard frontend (CloudFront CDN)
-  - openbark-logs: ALB access logs, application logs
+  - safemail-static: dashboard frontend (CloudFront CDN)
+  - safemail-logs: ALB access logs, application logs
 
 CloudWatch:
   - Log groups per service
@@ -675,8 +675,8 @@ CloudWatch:
 ```bash
 # Prerequisites: Docker, Python 3.12, Node 20
 
-git clone https://github.com/openbark/openbark
-cd openbark
+git clone https://github.com/safemail/safemail
+cd safemail
 
 # Start dependencies
 docker compose up -d postgres redis
@@ -700,7 +700,7 @@ npm run dev                    # dashboard on :3000
 
 **`.env.example`:**
 ```
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/openbark
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/safemail
 REDIS_URL=redis://localhost:6379/0
 JWT_PRIVATE_KEY_PATH=./keys/private.pem
 JWT_PUBLIC_KEY_PATH=./keys/public.pem
@@ -719,7 +719,7 @@ FRONTEND_URL=http://localhost:3000
 ## 11. Project Structure
 
 ```
-openbark/
+safemail/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py                 # FastAPI app init

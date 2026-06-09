@@ -22,7 +22,7 @@ def send_alert_email(parent_email: str, child_name: str, alert: dict) -> None:
     category = CATEGORY_LABELS.get(alert["category"], alert["category"])
 
     html = f"""
-<h2>OpenBark Safety Alert</h2>
+<h2>SafeMail Safety Alert</h2>
 <p><strong>Severity:</strong> {severity}<br>
 <strong>Category:</strong> {category}<br>
 <strong>Child:</strong> {child_name}</p>
@@ -34,9 +34,9 @@ def send_alert_email(parent_email: str, child_name: str, alert: dict) -> None:
 """
 
     message = Mail(
-        from_email="alerts@openbark.com",
+        from_email="alerts@safemail.com",
         to_emails=parent_email,
-        subject=f"[OpenBark] {severity} Alert — {child_name}'s Email",
+        subject=f"[SafeMail] {severity} Alert — {child_name}'s Email",
         html_content=html,
     )
     SendGridAPIClient(settings.sendgrid_api_key).send(message)
