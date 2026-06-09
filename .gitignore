@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Env
+.env
+*.pem
+
+# Node
+node_modules/
+dist/
+.DS_Store
+
+# Alembic
+alembic/versions/*.pyc
+
+# IDE
+.vscode/
+.idea/
