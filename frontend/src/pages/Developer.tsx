@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { devApi } from "@/api/developer";
+import type { ClassifyResponse } from "@/api/developer";
 
 type Status = { type: "success" | "error"; message: string } | null;
 
@@ -71,7 +72,7 @@ export default function Developer() {
   const [subject, setSubject]             = useState("");
   const [sender, setSender]               = useState("test@example.com");
   const [classifyLoading, setClassifyLoading] = useState(false);
-  const [classifyResult, setClassifyResult]   = useState<Record<string, unknown> | null>(null);
+  const [classifyResult, setClassifyResult]   = useState<ClassifyResponse | null>(null);
   const [classifyError, setClassifyError]     = useState<string | null>(null);
 
   useEffect(() => {
@@ -204,12 +205,36 @@ export default function Developer() {
         </div>
         {classifyError && <p style={{ color: "#dc2626", fontSize: 13, marginTop: 8 }}>{classifyError}</p>}
         {classifyResult && (
-          <pre style={{
-            marginTop: 12, background: "#f8fafc", border: "1px solid #e2e8f0",
-            borderRadius: 7, padding: 14, fontSize: 12, overflowX: "auto", lineHeight: 1.6,
-          }}>
-            {JSON.stringify(classifyResult, null, 2)}
-          </pre>
+          <>
+            <pre style={{
+              marginTop: 12, background: "#f8fafc", border: "1px solid #e2e8f0",
+              borderRadius: 7, padding: 14, fontSize: 12, overflowX: "auto", lineHeight: 1.6,
+            }}>
+              {JSON.stringify(classifyResult.classification, null, 2)}
+            </pre>
+            <div style={{
+              marginTop: 10, display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center",
+              background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: 7, padding: "10px 14px",
+            }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                LLM usage
+              </span>
+              <span style={{ fontSize: 13, color: "#374151" }}>
+                {classifyResult.usage.input_tokens.toLocaleString()} input
+              </span>
+              <span style={{ fontSize: 13, color: "#374151" }}>
+                {classifyResult.usage.output_tokens.toLocaleString()} output
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                {classifyResult.usage.cost_usd < 0.01
+                  ? "< $0.01"
+                  : `$${classifyResult.usage.cost_usd.toFixed(4)}`}
+              </span>
+              <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: "auto" }}>
+                counted in admin LLM stats
+              </span>
+            </div>
+          </>
         )}
       </Card>
 

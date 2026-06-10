@@ -186,8 +186,12 @@ class ClassifyRequest(BaseModel):
 async def classify(
     body: ClassifyRequest,
     _: Annotated[Parent, Depends(get_current_developer)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    from app.services.analysis import classify_email
+    from app.services.analysis import classify_email, token_cost_usd
+    from app.models.task_log import TaskLog
+
+    started = datetime.now(timezone.utc)
     result = classify_email({
         "direction": "inbound",
         "sender_address": body.sender,
@@ -195,7 +199,33 @@ async def classify(
         "subject": body.subject,
         "body_text": body.email_body,
     })
-    return result
+
+    input_tokens = result.pop("input_tokens", 0)
+    output_tokens = result.pop("output_tokens", 0)
+    duration_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
+
+    # Log the playground call so its token usage counts toward admin LLM stats.
+    db.add(TaskLog(
+        task_name="playground_classify",
+        status="success",
+        duration_ms=duration_ms,
+        meta={
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "severity": result.get("severity", "none"),
+            "playground": True,
+        },
+    ))
+    await db.commit()
+
+    return {
+        "classification": result,
+        "usage": {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "cost_usd": token_cost_usd(input_tokens, output_tokens),
+        },
+    }
 
 
 @router.post("/test-notification")
