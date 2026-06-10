@@ -1,0 +1,140 @@
+# SafeMail
+
+AI-powered email monitoring for parents. Connects to a child's Gmail account, scans incoming emails with Claude AI, and sends an alert only when genuinely dangerous content is detected — self-harm, grooming, bullying, drugs, stranger contact, or personal information sharing.
+
+**Raw email body text is never stored.** Only the AI-generated summary, category, severity, and metadata are written to the database.
+
+## Features
+
+- Gmail OAuth integration — connect a child's account in seconds
+- Claude AI classification with a 0.70 confidence threshold
+- Smart alerts: parents only hear about real risks, not noise
+- Push notifications (FCM) and email digests (SendGrid)
+- Dashboard with alert feed, severity badges, and per-child settings
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | Python 3.12 · FastAPI · SQLAlchemy · Alembic |
+| Workers | Celery · Redis |
+| Database | PostgreSQL |
+| AI | Anthropic Claude API |
+| Frontend | React 18 · TypeScript · Vite |
+| Auth | JWT RS256 · bcrypt |
+| Encryption | Fernet (OAuth tokens at rest) |
+| Notifications | SendGrid · Firebase FCM |
+
+## Quick Start
+
+### Prerequisites
+
+```bash
+python3.12 --version
+node --version      # 20+
+docker --version
+```
+
+### First-time setup
+
+```bash
+cd backend
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# Generate JWT keypair
+mkdir -p keys
+openssl genrsa -out keys/private.pem 2048
+openssl rsa -in keys/private.pem -pubout -out keys/public.pem
+
+# Generate Fernet encryption key — copy output to .env as FERNET_KEY
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
+cp .env.example .env   # fill in all values
+```
+
+### Run locally (4 terminals)
+
+```bash
+# 1. Databases
+docker compose up postgres redis
+
+# 2. API  →  http://localhost:8000  (Swagger: /docs)
+cd backend && source .venv/bin/activate
+alembic upgrade head
+uvicorn app.main:app --reload
+
+# 3. Celery worker (polls Gmail every 5 min, runs AI, sends alerts)
+cd backend && source .venv/bin/activate
+celery -A app.worker worker -l info
+
+# 4. Frontend  →  http://localhost:3000
+cd frontend && npm install && npm run dev
+```
+
+Or start everything at once:
+
+```bash
+docker compose up
+```
+
+## Environment Variables
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection (asyncpg format) |
+| `REDIS_URL` | Redis connection |
+| `FERNET_KEY` | AES encryption key for OAuth tokens |
+| `JWT_PRIVATE_KEY_PATH` | Path to RSA private key |
+| `JWT_PUBLIC_KEY_PATH` | Path to RSA public key |
+| `GOOGLE_CLIENT_ID` | Google OAuth app client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth app client secret |
+| `GOOGLE_REDIRECT_URI` | Must match Google Console exactly |
+| `ANTHROPIC_API_KEY` | Claude API key for email classification |
+| `SENDGRID_API_KEY` | For alert and digest emails |
+| `FCM_SERVICE_ACCOUNT_JSON` | Firebase push notifications (optional) |
+
+See `.env.example` for the full template.
+
+## Running Tests
+
+```bash
+cd backend && source .venv/bin/activate
+
+# Unit + pipeline tests (~5s, no API key needed)
+pytest tests/evaluation/test_pipeline.py -v
+
+# Auth + API tests (requires test database)
+pytest tests/test_auth.py tests/test_alerts.py -v
+
+# Full AI accuracy suite (calls real Claude API, ~$0.20, ~2 min)
+pytest tests/evaluation/test_classifier.py -v -s
+
+# Precision/recall report only
+pytest tests/evaluation/test_classifier.py::test_precision_recall_report -v -s
+```
+
+Quality gates: ≥ 85% recall · ≤ 15% false positive rate.
+
+## Architecture Notes
+
+- **No raw email storage.** Email bodies live in memory and the Redis queue only; only the AI summary and metadata reach Postgres.
+- **Celery uses a sync SQLAlchemy engine.** FastAPI uses async (asyncpg). Both point at the same database — don't mix sessions between the two.
+- **Gmail polling every 5 minutes.** A Redis dedup set (7-day TTL) prevents the same message being analyzed twice.
+- **JWT uses RS256** (asymmetric). Private key signs, public key verifies. Both live in `backend/keys/` (gitignored).
+
+## DB Migrations
+
+```bash
+# After changing a model
+alembic revision --autogenerate -m "description"
+alembic upgrade head
+
+# Roll back one step
+alembic downgrade -1
+```
+
+## API
+
+Base URL: `http://localhost:8000/v1`  
+Swagger UI: `http://localhost:8000/docs`
