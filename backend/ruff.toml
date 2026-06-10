@@ -1,0 +1,23 @@
+# Ruff configuration for the SafeMail backend.
+# Run with: ruff check .   (auto-fix: ruff check --fix .)
+target-version = "py312"
+line-length = 100
+
+# Generated / vendored code that shouldn't be linted.
+extend-exclude = ["alembic/versions", ".venv"]
+
+[lint]
+# A pragmatic default rule set:
+#   E/W  pycodestyle    F  pyflakes      I  isort
+#   B    bugbear        UP pyupgrade     C4 comprehensions
+select = ["E", "W", "F", "I", "B", "UP", "C4"]
+# E501 (line too long) is handled by the formatter; B008 clashes with the
+# FastAPI Depends() default-argument pattern used throughout the routers.
+ignore = ["E501", "B008"]
+
+[lint.per-file-ignores]
+# Migrations and package __init__ files re-export names intentionally.
+"__init__.py" = ["F401"]
+
+[format]
+quote-style = "double"
