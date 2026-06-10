@@ -36,6 +36,9 @@ async def list_alerts(
 
     q = select(Alert).where(Alert.child_id.in_(child_ids))
 
+    if not current_parent.is_developer:
+        q = q.where(~Alert.gmail_message_id.like("fake_%"))
+
     if child_id:
         q = q.where(Alert.child_id == uuid.UUID(child_id))
     if severity:
@@ -70,7 +73,7 @@ async def update_alert(
     current_parent: Annotated[Parent, Depends(get_current_parent)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    alert = await _get_owned_alert(db, alert_id, current_parent.id)
+    alert = await _get_owned_alert(db, alert_id, current_parent.id, is_developer=current_parent.is_developer)
     if body.reviewed:
         alert.reviewed_at = datetime.now(timezone.utc)
     await db.commit()
@@ -87,19 +90,24 @@ async def submit_feedback(
 ):
     if body.feedback not in ("correct", "false_positive"):
         raise HTTPException(status_code=400, detail="feedback must be 'correct' or 'false_positive'")
-    alert = await _get_owned_alert(db, alert_id, current_parent.id)
+    alert = await _get_owned_alert(db, alert_id, current_parent.id, is_developer=current_parent.is_developer)
     alert.parent_feedback = body.feedback
     await db.commit()
     return {"detail": "Feedback recorded"}
 
 
-async def _get_owned_alert(db: AsyncSession, alert_id: str, parent_id: uuid.UUID) -> Alert:
-    result = await db.execute(
+async def _get_owned_alert(
+    db: AsyncSession, alert_id: str, parent_id: uuid.UUID, *, is_developer: bool = False
+) -> Alert:
+    q = (
         select(Alert)
         .join(Child, Child.id == Alert.child_id)
         .where(Alert.id == uuid.UUID(alert_id), Child.parent_id == parent_id)
         .options(selectinload(Alert.child))
     )
+    if not is_developer:
+        q = q.where(~Alert.gmail_message_id.like("fake_%"))
+    result = await db.execute(q)
     alert = result.scalar_one_or_none()
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
