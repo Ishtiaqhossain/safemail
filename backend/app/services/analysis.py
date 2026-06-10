@@ -4,6 +4,20 @@ from app.config import get_settings
 
 settings = get_settings()
 
+# Model and pricing — single source of truth shared by the analysis pipeline,
+# the admin LLM-stats endpoint, and the developer classifier playground.
+MODEL_NAME = "claude-sonnet-4-6"
+INPUT_TOKEN_PRICE_PER_M = 3.00   # USD per million input tokens
+OUTPUT_TOKEN_PRICE_PER_M = 15.00  # USD per million output tokens
+
+
+def token_cost_usd(input_tokens: int, output_tokens: int) -> float:
+    return round(
+        input_tokens / 1_000_000 * INPUT_TOKEN_PRICE_PER_M
+        + output_tokens / 1_000_000 * OUTPUT_TOKEN_PRICE_PER_M,
+        4,
+    )
+
 SYSTEM_PROMPT = """You are a child safety classifier for a parental monitoring service.
 Analyze the provided email and determine if it contains content that poses a safety risk to a minor.
 Be precise — false positives erode parent trust. Normal school, social, or commercial emails should return severity "none".
@@ -41,7 +55,7 @@ def classify_email(message: dict) -> dict:
     )
 
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model=MODEL_NAME,
         max_tokens=512,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_content}],

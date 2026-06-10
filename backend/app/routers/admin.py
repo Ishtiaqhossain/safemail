@@ -12,12 +12,14 @@ from app.models.child import Child
 from app.models.gmail_connection import GmailConnection
 from app.models.alert import Alert
 from app.models.task_log import TaskLog
+from app.services.analysis import (
+    MODEL_NAME, INPUT_TOKEN_PRICE_PER_M, OUTPUT_TOKEN_PRICE_PER_M, token_cost_usd,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
-# Pricing for claude-sonnet-4-6 (USD per million tokens)
-INPUT_TOKEN_PRICE_PER_M = 3.00
-OUTPUT_TOKEN_PRICE_PER_M = 15.00
+# Tasks whose task_log.meta carries Claude token usage.
+LLM_TASK_NAMES = ["analyze_message", "playground_classify"]
 
 
 async def _llm_usage(db: AsyncSession, since: datetime | None = None) -> dict:
@@ -26,7 +28,7 @@ async def _llm_usage(db: AsyncSession, since: datetime | None = None) -> dict:
     input_tok_col = cast(TaskLog.meta["input_tokens"].astext, Integer)
     output_tok_col = cast(TaskLog.meta["output_tokens"].astext, Integer)
     filters = [
-        TaskLog.task_name == "analyze_message",
+        TaskLog.task_name.in_(LLM_TASK_NAMES),
         TaskLog.status == "success",
         input_tok_col.isnot(None),
     ]
@@ -41,13 +43,11 @@ async def _llm_usage(db: AsyncSession, since: datetime | None = None) -> dict:
         ).where(and_(*filters))
     )).one()
 
-    cost = (row.input_tokens / 1_000_000 * INPUT_TOKEN_PRICE_PER_M
-            + row.output_tokens / 1_000_000 * OUTPUT_TOKEN_PRICE_PER_M)
     return {
         "calls": row.calls,
         "input_tokens": row.input_tokens,
         "output_tokens": row.output_tokens,
-        "cost_usd": round(cost, 4),
+        "cost_usd": token_cost_usd(row.input_tokens, row.output_tokens),
     }
 
 
@@ -58,7 +58,7 @@ async def llm_stats(
 ):
     now = datetime.now(timezone.utc)
     return {
-        "model": "claude-sonnet-4-6",
+        "model": MODEL_NAME,
         "pricing": {
             "input_per_million": INPUT_TOKEN_PRICE_PER_M,
             "output_per_million": OUTPUT_TOKEN_PRICE_PER_M,
