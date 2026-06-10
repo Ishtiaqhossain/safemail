@@ -42,6 +42,32 @@ def send_alert_email(parent_email: str, child_name: str, alert: dict) -> None:
     SendGridAPIClient(settings.sendgrid_api_key).send(message)
 
 
+def send_verification_email(to_email: str, verify_url: str) -> None:
+    from sendgrid import SendGridAPIClient
+    from sendgrid.helpers.mail import Mail
+
+    html = f"""
+<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2 style="color:#0f172a">Verify your SafeMail email</h2>
+  <p>Thanks for signing up. Click below to verify your email address and activate your account.</p>
+  <p style="margin:24px 0">
+    <a href="{verify_url}"
+       style="background:#2563eb;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-weight:600">
+      Verify email address
+    </a>
+  </p>
+  <p style="color:#64748b;font-size:13px">This link expires in 24 hours. If you didn't create a SafeMail account, you can ignore this email.</p>
+</div>"""
+
+    message = Mail(
+        from_email="noreply@safemail.com",
+        to_emails=to_email,
+        subject="Verify your SafeMail email address",
+        html_content=html,
+    )
+    SendGridAPIClient(settings.sendgrid_api_key).send(message)
+
+
 def send_password_reset_email(to_email: str, reset_url: str) -> None:
     from sendgrid import SendGridAPIClient
     from sendgrid.helpers.mail import Mail

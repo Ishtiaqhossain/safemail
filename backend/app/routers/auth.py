@@ -18,6 +18,7 @@ from app.auth import (
     hash_password, verify_password,
     create_access_token, create_refresh_token,
     create_oauth_state_token, create_password_reset_token,
+    create_email_verification_token,
     decode_token, get_current_parent,
 )
 from app.services.crypto import encrypt_token
@@ -54,8 +55,22 @@ async def register(body: RegisterRequest, response: Response, db: Annotated[Asyn
     await db.commit()
     await db.refresh(parent)
 
+    # Send verification email (best-effort — don't fail registration if email is down)
+    try:
+        from app.services.notifications import send_verification_email
+        token = create_email_verification_token(parent.id, parent.email)
+        verify_url = f"{settings.frontend_url}/verify-email?token={token}"
+        send_verification_email(parent.email, verify_url)
+    except Exception:
+        pass
+
     _set_refresh_cookie(response, create_refresh_token(parent.id))
-    return {"access_token": create_access_token(parent.id, parent.email, parent.is_admin, parent.is_developer), "is_admin": parent.is_admin, "is_developer": parent.is_developer}
+    return {
+        "access_token": create_access_token(parent.id, parent.email, parent.is_admin, parent.is_developer, parent.is_email_verified),
+        "is_admin": parent.is_admin,
+        "is_developer": parent.is_developer,
+        "is_email_verified": parent.is_email_verified,
+    }
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -66,7 +81,12 @@ async def login(body: LoginRequest, response: Response, db: Annotated[AsyncSessi
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     _set_refresh_cookie(response, create_refresh_token(parent.id))
-    return {"access_token": create_access_token(parent.id, parent.email, parent.is_admin, parent.is_developer), "is_admin": parent.is_admin, "is_developer": parent.is_developer}
+    return {
+        "access_token": create_access_token(parent.id, parent.email, parent.is_admin, parent.is_developer, parent.is_email_verified),
+        "is_admin": parent.is_admin,
+        "is_developer": parent.is_developer,
+        "is_email_verified": parent.is_email_verified,
+    }
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -86,13 +106,55 @@ async def refresh(request: Request, db: Annotated[AsyncSession, Depends(get_db)]
     if not parent:
         raise HTTPException(status_code=401, detail="Parent not found")
 
-    return {"access_token": create_access_token(parent.id, parent.email, parent.is_admin, parent.is_developer), "is_admin": parent.is_admin, "is_developer": parent.is_developer}
+    return {
+        "access_token": create_access_token(parent.id, parent.email, parent.is_admin, parent.is_developer, parent.is_email_verified),
+        "is_admin": parent.is_admin,
+        "is_developer": parent.is_developer,
+        "is_email_verified": parent.is_email_verified,
+    }
 
 
 @router.post("/logout")
 async def logout(response: Response):
     response.delete_cookie("refresh_token")
     return {"detail": "Logged out"}
+
+
+@router.get("/verify-email")
+async def verify_email(token: str, db: Annotated[AsyncSession, Depends(get_db)]):
+    invalid = HTTPException(status_code=400, detail="Verification link is invalid or has expired.")
+    try:
+        payload = decode_token(token)
+        if payload.get("type") != "email_verification":
+            raise invalid
+        parent_id = payload.get("sub")
+    except Exception:
+        raise invalid
+
+    result = await db.execute(select(Parent).where(Parent.id == uuid.UUID(parent_id)))
+    parent = result.scalar_one_or_none()
+    if not parent:
+        raise invalid
+
+    parent.is_email_verified = True
+    await db.commit()
+    return RedirectResponse(f"{settings.frontend_url}/dashboard?verified=true")
+
+
+@router.post("/resend-verification", status_code=200)
+async def resend_verification(
+    current_parent: Annotated[Parent, Depends(get_current_parent)],
+):
+    if current_parent.is_email_verified:
+        return {"detail": "Email already verified."}
+    try:
+        from app.services.notifications import send_verification_email
+        token = create_email_verification_token(current_parent.id, current_parent.email)
+        verify_url = f"{settings.frontend_url}/verify-email?token={token}"
+        send_verification_email(current_parent.email, verify_url)
+    except Exception:
+        pass
+    return {"detail": "Verification email sent."}
 
 
 @router.post("/forgot-password", status_code=200)

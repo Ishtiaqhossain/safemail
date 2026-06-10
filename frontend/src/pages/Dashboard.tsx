@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { childrenApi } from "@/api/children";
 import { alertsApi } from "@/api/alerts";
 import { AlertBadge } from "@/components/AlertBadge";
+import { getIsEmailVerified, setIsEmailVerified } from "@/api/client";
+import api from "@/api/client";
 import type { Child, Alert } from "@/types";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -43,6 +45,10 @@ function ConnectionStatus({ status }: { status: "active" | "revoked" | "error" }
 }
 
 export default function Dashboard() {
+  const [searchParams] = useSearchParams();
+  const justVerified = searchParams.get("verified") === "true";
+  const [emailVerified, setEmailVerified] = useState(getIsEmailVerified());
+  const [resendSent, setResendSent] = useState(false);
   const [children, setChildren] = useState<Child[]>([]);
   const [recentAlerts, setRecentAlerts] = useState<Alert[]>([]);
   const [unreviewedCount, setUnreviewedCount] = useState(0);
@@ -61,6 +67,16 @@ export default function Dashboard() {
     });
   }, []);
 
+  const resendVerification = async () => {
+    await api.post("/auth/resend-verification");
+    setResendSent(true);
+  };
+
+  const handleJustVerified = () => {
+    setIsEmailVerified(true);
+    setEmailVerified(true);
+  };
+
   if (loading) {
     return <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Loading…</div>;
   }
@@ -69,6 +85,33 @@ export default function Dashboard() {
 
   return (
     <div style={{ padding: "28px 24px", maxWidth: 960, margin: "0 auto" }}>
+
+      {/* Email verification banners */}
+      {justVerified && emailVerified === false ? (() => { handleJustVerified(); return null; })() : null}
+      {justVerified && (
+        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 18 }}>✅</span>
+          <span style={{ fontSize: 14, color: "#16a34a", fontWeight: 500 }}>Email verified — you're all set!</span>
+        </div>
+      )}
+      {!emailVerified && !justVerified && (
+        <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 18 }}>📧</span>
+          <span style={{ fontSize: 14, color: "#92400e", flex: 1 }}>
+            Please verify your email address. Check your inbox for a verification link.
+          </span>
+          {resendSent ? (
+            <span style={{ fontSize: 13, color: "#16a34a", fontWeight: 500 }}>Email sent!</span>
+          ) : (
+            <button
+              onClick={resendVerification}
+              style={{ background: "none", border: "1px solid #d97706", color: "#92400e", padding: "4px 12px", borderRadius: 5, fontSize: 13, fontWeight: 500 }}
+            >
+              Resend email
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Page header */}
       <div style={{ marginBottom: 24 }}>

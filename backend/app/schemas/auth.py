@@ -17,6 +17,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     is_admin: bool = False
     is_developer: bool = False
+    is_email_verified: bool = True
 
 
 class ForgotPasswordRequest(BaseModel):

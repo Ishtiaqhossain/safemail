@@ -5,6 +5,7 @@ const api = axios.create({ baseURL: "/v1", withCredentials: true });
 let accessToken: string | null = null;
 let adminFlag = false;
 let developerFlag = false;
+let emailVerifiedFlag = true;
 
 export function setAccessToken(token: string) {
   accessToken = token;
@@ -14,12 +15,15 @@ export function clearAccessToken() {
   accessToken = null;
   adminFlag = false;
   developerFlag = false;
+  emailVerifiedFlag = true;
 }
 
 export function setIsAdmin(v: boolean) { adminFlag = v; }
 export function getIsAdmin() { return adminFlag; }
 export function setIsDeveloper(v: boolean) { developerFlag = v; }
 export function getIsDeveloper() { return developerFlag; }
+export function setIsEmailVerified(v: boolean) { emailVerifiedFlag = v; }
+export function getIsEmailVerified() { return emailVerifiedFlag; }
 
 export function isAuthenticated() {
   return !!accessToken;
@@ -31,6 +35,7 @@ export async function tryRefresh(): Promise<boolean> {
     setAccessToken(data.access_token);
     setIsAdmin(data.is_admin ?? false);
     setIsDeveloper(data.is_developer ?? false);
+    setIsEmailVerified(data.is_email_verified ?? true);
     return true;
   } catch {
     return false;

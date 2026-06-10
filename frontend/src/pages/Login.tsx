@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
-import { setAccessToken, setIsAdmin, setIsDeveloper } from "@/api/client";
+import { setAccessToken, setIsAdmin, setIsDeveloper, setIsEmailVerified } from "@/api/client";
 
 export default function Login({ onLogin }: { onLogin?: () => void }) {
   const navigate = useNavigate();
@@ -25,6 +25,7 @@ export default function Login({ onLogin }: { onLogin?: () => void }) {
       setAccessToken(data.access_token);
       setIsAdmin(data.is_admin ?? false);
       setIsDeveloper(data.is_developer ?? false);
+      setIsEmailVerified(data.is_email_verified ?? true);
       onLogin?.();
       navigate("/dashboard");
     } catch (err: unknown) {

@@ -37,11 +37,30 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
-def create_access_token(parent_id: uuid.UUID, email: str, is_admin: bool = False, is_developer: bool = False) -> str:
+def create_access_token(
+    parent_id: uuid.UUID, email: str,
+    is_admin: bool = False, is_developer: bool = False,
+    is_email_verified: bool = True,
+) -> str:
     _load_keys()
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
     return jwt.encode(
-        {"sub": str(parent_id), "email": email, "is_admin": is_admin, "is_developer": is_developer, "exp": expire, "type": "access"},
+        {
+            "sub": str(parent_id), "email": email,
+            "is_admin": is_admin, "is_developer": is_developer,
+            "is_email_verified": is_email_verified,
+            "exp": expire, "type": "access",
+        },
+        _private_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+
+def create_email_verification_token(parent_id: uuid.UUID, email: str) -> str:
+    _load_keys()
+    expire = datetime.now(timezone.utc) + timedelta(hours=24)
+    return jwt.encode(
+        {"sub": str(parent_id), "email": email, "exp": expire, "type": "email_verification"},
         _private_key,
         algorithm=settings.jwt_algorithm,
     )
