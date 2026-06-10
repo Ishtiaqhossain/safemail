@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { adminApi } from "@/api/admin";
-import type { AdminOverview, AdminEvent, TaskLogEntry } from "@/types";
+import type { AdminOverview, AdminEvent, TaskLogEntry, LlmStats } from "@/types";
 
-type Tab = "overview" | "events" | "tasks";
+type Tab = "overview" | "llm" | "events" | "tasks";
+
+const fmtNum = (n: number) => n.toLocaleString();
+const fmtCost = (n: number) => (n === 0 ? "$0.00" : n < 0.01 ? "< $0.01" : `$${n.toFixed(n >= 1 ? 2 : 4)}`);
 
 const SEVERITY_COLOR: Record<string, string> = {
   critical: "#dc2626",
@@ -314,6 +317,54 @@ function TasksTab() {
   );
 }
 
+// ── LLM Usage Tab ─────────────────────────────────────────────────────────────
+
+function LlmUsageCard({ label, period }: { label: string; period: LlmStats["all_time"] }) {
+  return (
+    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "18px 22px", minWidth: 200, flex: 1 }}>
+      <p style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{label}</p>
+      <p style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>{fmtCost(period.cost_usd)}</p>
+      <div style={{ fontSize: 13, color: "#64748b", lineHeight: "1.7" }}>
+        <div>{fmtNum(period.calls)} calls</div>
+        <div>{fmtNum(period.input_tokens)} input tokens</div>
+        <div>{fmtNum(period.output_tokens)} output tokens</div>
+      </div>
+    </div>
+  );
+}
+
+function LlmTab() {
+  const [data, setData] = useState<LlmStats | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    adminApi.getLlmStats()
+      .then(setData)
+      .catch((e) => setError(e?.response?.data?.detail ?? "Failed to load LLM stats"));
+  }, []);
+
+  if (error) return <div style={{ padding: 40, textAlign: "center", color: "#dc2626" }}>{error}</div>;
+  if (!data) return <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Loading…</div>;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <p style={{ fontSize: 13, color: "#64748b" }}>
+        Model <code style={{ fontFamily: "monospace" }}>{data.model}</code> · ${data.pricing.input_per_million}/M input · ${data.pricing.output_per_million}/M output
+      </p>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <LlmUsageCard label="Last 7 days"  period={data.last_7d} />
+        <LlmUsageCard label="Last 30 days" period={data.last_30d} />
+        <LlmUsageCard label="All time"     period={data.all_time} />
+      </div>
+      {data.all_time.calls === 0 && (
+        <p style={{ fontSize: 13, color: "#94a3b8" }}>
+          No emails scanned yet — usage will populate after the next Gmail sync runs.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Admin() {
@@ -328,7 +379,7 @@ export default function Admin() {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #e2e8f0", marginBottom: 24 }}>
-        {(["overview", "events", "tasks"] as Tab[]).map((t) => (
+        {(["overview", "llm", "events", "tasks"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -342,12 +393,13 @@ export default function Admin() {
               marginBottom: -1,
             }}
           >
-            {t}
+            {t === "llm" ? "LLM Usage" : t}
           </button>
         ))}
       </div>
 
       {tab === "overview" && <OverviewTab />}
+      {tab === "llm"      && <LlmTab />}
       {tab === "events"   && <EventsTab />}
       {tab === "tasks"    && <TasksTab />}
     </div>

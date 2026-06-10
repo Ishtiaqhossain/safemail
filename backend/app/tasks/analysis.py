@@ -25,10 +25,20 @@ def analyze_message(self, message: dict):
         logger.error("Claude API error: %s", exc)
         raise self.retry(exc=exc, countdown=30)
 
+    input_tokens = result.pop("input_tokens", 0)
+    output_tokens = result.pop("output_tokens", 0)
     severity = result.get("severity", "none")
     confidence = float(result.get("confidence", 0))
 
+    # Log token usage on every scan, including those that don't produce an alert,
+    # so LLM cost reflects all classification work.
     if severity == "none" or confidence < settings.confidence_threshold:
+        with SyncSessionLocal() as db:
+            write_task_log(db, "analyze_message", "success",
+                           duration_ms=timer.elapsed_ms(),
+                           meta={"child_id": message["child_id"], "severity": severity,
+                                 "input_tokens": input_tokens, "output_tokens": output_tokens,
+                                 "skipped": True})
         return
 
     with SyncSessionLocal() as db:
@@ -60,7 +70,9 @@ def analyze_message(self, message: dict):
         db.refresh(alert)
         write_task_log(db, "analyze_message", "success",
                        duration_ms=timer.elapsed_ms(),
-                       meta={"child_id": message["child_id"], "severity": severity, "category": result["category"]})
+                       meta={"child_id": message["child_id"], "severity": severity,
+                             "category": result["category"],
+                             "input_tokens": input_tokens, "output_tokens": output_tokens})
 
         from app.tasks.analysis import deliver_alert
         deliver_alert.delay(str(alert.id))

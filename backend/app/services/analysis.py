@@ -47,4 +47,7 @@ def classify_email(message: dict) -> dict:
         messages=[{"role": "user", "content": user_content}],
     )
 
-    return json.loads(response.content[0].text)
+    result = json.loads(response.content[0].text)
+    result["input_tokens"] = response.usage.input_tokens
+    result["output_tokens"] = response.usage.output_tokens
+    return result
