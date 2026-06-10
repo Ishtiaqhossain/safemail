@@ -1,7 +1,9 @@
+import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
+from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, cast, Integer
 
@@ -12,9 +14,11 @@ from app.models.child import Child
 from app.models.gmail_connection import GmailConnection
 from app.models.alert import Alert
 from app.models.task_log import TaskLog
+from app.models.allowed_email import AllowedEmail
 from app.services.analysis import (
     MODEL_NAME, INPUT_TOKEN_PRICE_PER_M, OUTPUT_TOKEN_PRICE_PER_M, token_cost_usd,
 )
+from app.services.allowlist import normalize_email
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -258,3 +262,63 @@ async def tasks(
         ],
         "meta": {"total": total, "page": page, "per_page": per_page},
     }
+
+
+# ── Invite-only allowlist ──────────────────────────────────────────────────────
+
+class AllowlistAddRequest(BaseModel):
+    email: EmailStr
+    note: str | None = None
+
+
+def _allowlist_entry(row: AllowedEmail) -> dict:
+    return {
+        "id": str(row.id),
+        "email": row.email,
+        "note": row.note,
+        "created_at": row.created_at.isoformat(),
+    }
+
+
+@router.get("/allowlist")
+async def list_allowlist(
+    _: Annotated[Parent, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    rows = (await db.execute(
+        select(AllowedEmail).order_by(AllowedEmail.created_at.desc())
+    )).scalars().all()
+    return {"data": [_allowlist_entry(r) for r in rows]}
+
+
+@router.post("/allowlist", status_code=201)
+async def add_allowlist(
+    body: AllowlistAddRequest,
+    admin: Annotated[Parent, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    email = normalize_email(body.email)
+    existing = (await db.execute(
+        select(AllowedEmail).where(func.lower(AllowedEmail.email) == email)
+    )).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="Email is already on the allowlist.")
+
+    entry = AllowedEmail(email=email, note=body.note, added_by=admin.id)
+    db.add(entry)
+    await db.commit()
+    await db.refresh(entry)
+    return _allowlist_entry(entry)
+
+
+@router.delete("/allowlist/{entry_id}", status_code=204)
+async def remove_allowlist(
+    entry_id: str,
+    _: Annotated[Parent, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    entry = await db.get(AllowedEmail, uuid.UUID(entry_id))
+    if not entry:
+        raise HTTPException(status_code=404, detail="Allowlist entry not found.")
+    await db.delete(entry)
+    await db.commit()

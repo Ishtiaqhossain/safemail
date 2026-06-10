@@ -85,6 +85,13 @@ export interface TaskLogEntry {
   created_at: string;
 }
 
+export interface AllowedEmail {
+  id: string;
+  email: string;
+  note: string | null;
+  created_at: string;
+}
+
 export interface LlmUsagePeriod {
   calls: number;
   input_tokens: number;

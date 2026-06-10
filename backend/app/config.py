@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     # Auth rate limiting (slowapi, Redis-backed). Disabled in the test suite.
     rate_limit_enabled: bool = True
 
+    # Invite-only alpha: only allowlisted emails may register / log in.
+    # Set False to open registration for public launch.
+    invite_only_enabled: bool = True
+
 
 @lru_cache
 def get_settings() -> Settings:

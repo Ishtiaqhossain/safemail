@@ -27,6 +27,7 @@ from app.ratelimit import (
     limiter, LOGIN_LIMIT, REGISTER_LIMIT, REFRESH_LIMIT,
     FORGOT_PASSWORD_LIMIT, RESET_PASSWORD_LIMIT, RESEND_VERIFICATION_LIMIT,
 )
+from app.services.allowlist import is_email_allowed, parent_count
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
@@ -54,6 +55,15 @@ async def register(request: Request, body: RegisterRequest, response: Response, 
     existing = await db.execute(select(Parent).where(Parent.email == body.email))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Email already registered")
+
+    # Invite-only gate. The very first account (empty parents table) is always
+    # allowed so a fresh deploy can bootstrap its admin without a chicken-and-egg.
+    if settings.invite_only_enabled:
+        if await parent_count(db) > 0 and not await is_email_allowed(db, body.email):
+            raise HTTPException(
+                status_code=403,
+                detail="SafeMail is in invite-only alpha — your email isn't on the list yet.",
+            )
 
     parent = Parent(email=body.email, password_hash=hash_password(body.password), full_name=body.full_name)
     db.add(parent)
@@ -85,6 +95,14 @@ async def login(request: Request, body: LoginRequest, response: Response, db: An
     parent = result.scalar_one_or_none()
     if not parent or not verify_password(body.password, parent.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    # Invite-only gate. Admins are exempt so the operator can't lock themselves out;
+    # everyone else must remain on the allowlist (supports revoking access).
+    if settings.invite_only_enabled and not parent.is_admin and not await is_email_allowed(db, body.email):
+        raise HTTPException(
+            status_code=403,
+            detail="Your access to the SafeMail alpha isn't enabled.",
+        )
 
     _set_refresh_cookie(response, create_refresh_token(parent.id))
     return {
