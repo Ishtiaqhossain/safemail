@@ -3,11 +3,35 @@ import { childrenApi } from "@/api/children";
 import { alertsApi } from "@/api/alerts";
 import type { Child, AlertPreference } from "@/types";
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#94a3b8", margin: "0 0 10px" }}>
+      {children}
+    </p>
+  );
+}
+
+function ConnStatus({ status }: { status: "active" | "revoked" | "error" }) {
+  const map = {
+    active:  { color: "#16a34a", bg: "#f0fdf4", dot: "#16a34a" },
+    revoked: { color: "#64748b", bg: "#f1f5f9", dot: "#94a3b8" },
+    error:   { color: "#dc2626", bg: "#fef2f2", dot: "#dc2626" },
+  };
+  const s = map[status];
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: s.color, background: s.bg, padding: "2px 8px", borderRadius: 99 }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.dot, display: "inline-block" }} />
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </span>
+  );
+}
+
 export default function Settings() {
   const [children, setChildren] = useState<Child[]>([]);
   const [newName, setNewName] = useState("");
   const [newYear, setNewYear] = useState("");
   const [addError, setAddError] = useState("");
+  const [addLoading, setAddLoading] = useState(false);
   const [prefs, setPrefs] = useState<Record<string, AlertPreference>>({});
 
   const load = () => childrenApi.list().then(setChildren);
@@ -26,6 +50,7 @@ export default function Settings() {
     e.preventDefault();
     if (!newName.trim()) return;
     setAddError("");
+    setAddLoading(true);
     try {
       await childrenApi.create(newName.trim(), newYear ? parseInt(newYear) : undefined);
       setNewName("");
@@ -34,6 +59,8 @@ export default function Settings() {
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to add child";
       setAddError(msg);
+    } finally {
+      setAddLoading(false);
     }
   };
 
@@ -49,77 +76,144 @@ export default function Settings() {
   };
 
   return (
-    <div style={{ padding: 24, maxWidth: 700, margin: "0 auto" }}>
-      <h2>Settings</h2>
+    <div style={{ padding: "28px 24px", maxWidth: 720, margin: "0 auto" }}>
 
-      <section style={{ marginBottom: 32 }}>
-        <h3>Add Child</h3>
-        <form onSubmit={addChild} style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-          <div>
-            <label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>Name</label>
-            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Emma" required />
+      {/* Header */}
+      <div style={{ marginBottom: 28 }}>
+        <h1 style={{ marginBottom: 4 }}>Settings</h1>
+        <p style={{ color: "#64748b", fontSize: 14 }}>Manage your children and notification preferences.</p>
+      </div>
+
+      {/* Add child */}
+      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "22px 24px", marginBottom: 28, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+        <h2 style={{ marginBottom: 16, fontSize: 15 }}>Add a child</h2>
+        <form onSubmit={addChild}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: addError ? 12 : 0 }}>
+            <div style={{ flex: "1 1 180px" }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>
+                Name <span style={{ color: "#dc2626" }}>*</span>
+              </label>
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Emma"
+                required
+                style={{ width: "100%" }}
+              />
+            </div>
+            <div style={{ flex: "0 0 120px" }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>
+                Birth year
+              </label>
+              <input
+                value={newYear}
+                onChange={(e) => setNewYear(e.target.value)}
+                placeholder="2014"
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-end" }}>
+              <button
+                type="submit"
+                disabled={addLoading}
+                style={{ padding: "8px 20px", background: "#2563eb", color: "#fff", borderRadius: 7, fontWeight: 600 }}
+              >
+                {addLoading ? "Adding…" : "Add child"}
+              </button>
+            </div>
           </div>
-          <div>
-            <label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>Birth year</label>
-            <input value={newYear} onChange={(e) => setNewYear(e.target.value)} placeholder="2014" style={{ width: 80 }} />
-          </div>
-          <button type="submit" style={{ padding: "7px 16px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer" }}>
-            Add
-          </button>
+          {addError && (
+            <p style={{ color: "#dc2626", fontSize: 13, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, padding: "7px 12px" }}>
+              {addError}
+            </p>
+          )}
         </form>
-        {addError && <p style={{ color: "#dc2626", marginTop: 8, fontSize: 14 }}>{addError}</p>}
-      </section>
+      </div>
 
-      <section>
-        <h3>Children</h3>
-        {children.map((child) => {
-          const pref = prefs[child.id];
-          return (
-            <div key={child.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, marginBottom: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <h4 style={{ margin: 0 }}>{child.display_name}</h4>
-                <button onClick={() => deleteChild(child.id)} style={{ color: "#dc2626", background: "none", border: "none", cursor: "pointer", fontSize: 13 }}>
-                  Delete
-                </button>
-              </div>
+      {/* Children list */}
+      {children.length === 0 ? (
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "36px 24px", textAlign: "center" }}>
+          <p style={{ color: "#94a3b8", fontSize: 14 }}>No children added yet. Use the form above to get started.</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {children.map((child) => {
+            const pref = prefs[child.id];
+            return (
+              <div key={child.id} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
 
-              <div style={{ marginBottom: 12 }}>
-                <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Gmail</p>
-                {child.gmail_connections.length > 0 ? (
-                  child.gmail_connections.map((conn) => (
-                    <div key={conn.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
-                      <span>{conn.gmail_address} <span style={{ color: conn.status === "active" ? "#16a34a" : "#dc2626" }}>({conn.status})</span></span>
-                      <button onClick={() => childrenApi.disconnectGmail(conn.id).then(load)} style={{ fontSize: 12, cursor: "pointer" }}>
-                        Disconnect
-                      </button>
+                {/* Child header */}
+                <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#eff6ff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
+                      👦
                     </div>
-                  ))
-                ) : (
-                  <button onClick={() => childrenApi.connectGmail(child.id)} style={{ fontSize: 13, cursor: "pointer", color: "#2563eb", background: "none", border: "none", padding: 0 }}>
-                    + Connect Gmail account
+                    <div>
+                      <p style={{ fontWeight: 600, fontSize: 15, color: "#0f172a" }}>{child.display_name}</p>
+                      {child.birth_year && (
+                        <p style={{ fontSize: 12, color: "#94a3b8" }}>Born {child.birth_year}</p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => deleteChild(child.id)}
+                    style={{ color: "#dc2626", background: "#fef2f2", border: "1px solid #fecaca", fontSize: 12, fontWeight: 500, padding: "4px 12px", borderRadius: 6 }}
+                  >
+                    Remove
                   </button>
+                </div>
+
+                {/* Gmail */}
+                <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9" }}>
+                  <SectionLabel>Gmail account</SectionLabel>
+                  {child.gmail_connections.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {child.gmail_connections.map((conn) => (
+                        <div key={conn.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", borderRadius: 7, padding: "9px 12px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <ConnStatus status={conn.status} />
+                            <span style={{ fontSize: 13, color: "#374151" }}>{conn.gmail_address}</span>
+                          </div>
+                          <button
+                            onClick={() => childrenApi.disconnectGmail(conn.id).then(load)}
+                            style={{ fontSize: 12, color: "#64748b", background: "none", border: "1px solid #e2e8f0", padding: "3px 10px", borderRadius: 5 }}
+                          >
+                            Disconnect
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => childrenApi.connectGmail(child.id)}
+                      style={{ padding: "8px 16px", background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", borderRadius: 7, fontSize: 13, fontWeight: 500 }}
+                    >
+                      + Connect Gmail account
+                    </button>
+                  )}
+                </div>
+
+                {/* Preferences */}
+                {pref && (
+                  <div style={{ padding: "14px 20px" }}>
+                    <SectionLabel>Alert preferences</SectionLabel>
+                    <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+                      <span style={{ color: "#374151", fontWeight: 500 }}>Digest frequency</span>
+                      <select
+                        value={pref.digest_frequency}
+                        onChange={(e) => savePref(child.id, { ...pref, digest_frequency: e.target.value as "daily" | "weekly" })}
+                        style={{ fontSize: 13 }}
+                      >
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                      </select>
+                    </label>
+                  </div>
                 )}
               </div>
-
-              {pref && (
-                <div style={{ fontSize: 13 }}>
-                  <p style={{ fontWeight: 600, marginBottom: 6 }}>Alert Preferences</p>
-                  <label>
-                    <span>Digest frequency: </span>
-                    <select
-                      value={pref.digest_frequency}
-                      onChange={(e) => savePref(child.id, { ...pref, digest_frequency: e.target.value as "daily" | "weekly" })}
-                    >
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                    </select>
-                  </label>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </section>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

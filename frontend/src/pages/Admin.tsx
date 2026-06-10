@@ -4,38 +4,77 @@ import type { AdminOverview, AdminEvent, TaskLogEntry } from "@/types";
 
 type Tab = "overview" | "events" | "tasks";
 
-const SEVERITY_COLORS: Record<string, string> = {
+const SEVERITY_COLOR: Record<string, string> = {
   critical: "#dc2626",
-  high: "#ea580c",
-  medium: "#d97706",
-  low: "#65a30d",
+  high:     "#ea580c",
+  medium:   "#d97706",
+  low:      "#16a34a",
 };
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
+// ── Shared primitives ─────────────────────────────────────────────────────────
+
+function Card({ children, style = {} }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "16px 20px", minWidth: 140 }}>
-      <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 4 }}>{label}</p>
-      <p style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>{value}</p>
+    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, ...style }}>
+      {children}
+    </div>
+  );
+}
+
+function StatCard({ label, value, warn }: { label: string; value: string | number; warn?: boolean }) {
+  return (
+    <div style={{
+      background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10,
+      padding: "14px 18px", minWidth: 130, flex: 1,
+      borderTop: warn ? "3px solid #d97706" : undefined,
+    }}>
+      <p style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>{label}</p>
+      <p style={{ fontSize: 24, fontWeight: 700, color: "#0f172a" }}>{value}</p>
     </div>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const color = status === "success" ? "#16a34a" : "#dc2626";
+  const ok = status === "success";
   return (
-    <span style={{ fontSize: 12, fontWeight: 600, color, background: color + "18", padding: "2px 8px", borderRadius: 99 }}>
+    <span style={{
+      fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 99,
+      background: ok ? "#f0fdf4" : "#fef2f2",
+      color: ok ? "#16a34a" : "#dc2626",
+    }}>
       {status}
     </span>
   );
 }
 
-function EventTypeBadge({ type }: { type: string }) {
-  const colors: Record<string, string> = { alert: "#dc2626", gmail_connection: "#2563eb", task: "#7c3aed" };
-  const c = colors[type] ?? "#6b7280";
+function TypeBadge({ type }: { type: string }) {
+  const palette: Record<string, [string, string]> = {
+    alert:            ["#fef2f2", "#dc2626"],
+    gmail_connection: ["#eff6ff", "#2563eb"],
+    task:             ["#f5f3ff", "#7c3aed"],
+  };
+  const [bg, color] = palette[type] ?? ["#f1f5f9", "#64748b"];
   return (
-    <span style={{ fontSize: 11, fontWeight: 600, color: c, background: c + "18", padding: "2px 8px", borderRadius: 99, whiteSpace: "nowrap" }}>
-      {type}
+    <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 99, background: bg, color, whiteSpace: "nowrap" }}>
+      {type.replace("_", " ")}
     </span>
+  );
+}
+
+function Pagination({ page, total, perPage, onChange }: { page: number; total: number; perPage: number; onChange: (p: number) => void }) {
+  const pages = Math.ceil(total / perPage);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 16 }}>
+      <button
+        onClick={() => onChange(Math.max(1, page - 1))} disabled={page === 1}
+        style={{ padding: "5px 12px", background: "#fff", border: "1px solid #e2e8f0", color: "#374151", borderRadius: 6, fontSize: 13 }}
+      >← Prev</button>
+      <span style={{ fontSize: 13, color: "#64748b" }}>Page {page} of {pages} · {total} total</span>
+      <button
+        onClick={() => onChange(page + 1)} disabled={page >= pages}
+        style={{ padding: "5px 12px", background: "#fff", border: "1px solid #e2e8f0", color: "#374151", borderRadius: 6, fontSize: 13 }}
+      >Next →</button>
+    </div>
   );
 }
 
@@ -43,98 +82,114 @@ function EventTypeBadge({ type }: { type: string }) {
 
 function OverviewTab() {
   const [data, setData] = useState<AdminOverview | null>(null);
-
   useEffect(() => { adminApi.getOverview().then(setData); }, []);
 
-  if (!data) return <p style={{ padding: 16, color: "#6b7280" }}>Loading…</p>;
+  if (!data) return <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Loading…</div>;
 
   const { system, alerts, stale_connections, false_positive_rate, recent_failures } = data;
   const totalConns = Object.values(system.connections_by_status).reduce<number>((s, n) => s + (n ?? 0), 0);
 
-  const alertRows = (bucket: typeof alerts.last_24h) =>
-    Object.entries(bucket).map(([sev, n]) => (
-      <span key={sev} style={{ marginRight: 12, color: SEVERITY_COLORS[sev] ?? "#374151" }}>
-        {sev}: <strong>{n}</strong>
-      </span>
-    ));
+  const alertPeriods: [string, typeof alerts.last_24h][] = [
+    ["Last 24 h", alerts.last_24h],
+    ["Last 7 d",  alerts.last_7d],
+    ["Last 30 d", alerts.last_30d],
+  ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-      {/* System counts */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+
+      {/* Stats */}
       <section>
-        <h3 style={{ marginBottom: 12 }}>System</h3>
+        <p style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>System</p>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <StatCard label="Parents" value={system.total_parents} />
-          <StatCard label="Children" value={system.total_children} />
-          <StatCard label="Active connections" value={system.connections_by_status["active"] ?? 0 as number} />
-          <StatCard label="Error connections" value={system.connections_by_status["error"] ?? 0 as number} />
-          <StatCard label="Total connections" value={totalConns} />
+          <StatCard label="Parents"           value={system.total_parents} />
+          <StatCard label="Children"          value={system.total_children} />
+          <StatCard label="Active conn."      value={system.connections_by_status["active"] ?? 0} />
+          <StatCard label="Error conn."       value={system.connections_by_status["error"] ?? 0} warn={(system.connections_by_status["error"] ?? 0) > 0} />
+          <StatCard label="Total conn."       value={totalConns} />
           {false_positive_rate !== null && (
-            <StatCard label="False positive rate" value={`${(false_positive_rate * 100).toFixed(1)}%`} />
+            <StatCard label="False pos. rate" value={`${(false_positive_rate * 100).toFixed(1)}%`} />
           )}
         </div>
       </section>
 
       {/* Alert pipeline */}
       <section>
-        <h3 style={{ marginBottom: 12 }}>Alert pipeline</h3>
-        <table style={{ borderCollapse: "collapse", fontSize: 14 }}>
-          <thead>
-            <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
-              <th style={{ padding: "6px 16px 6px 0" }}>Period</th>
-              <th style={{ padding: "6px 0" }}>By severity</th>
-            </tr>
-          </thead>
-          <tbody>
-            {([["Last 24 h", alerts.last_24h], ["Last 7 d", alerts.last_7d], ["Last 30 d", alerts.last_30d]] as const).map(([label, bucket]) => (
-              <tr key={label} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                <td style={{ padding: "8px 16px 8px 0", color: "#6b7280", whiteSpace: "nowrap" }}>{label}</td>
-                <td style={{ padding: "8px 0" }}>
-                  {Object.keys(bucket).length ? alertRows(bucket) : <span style={{ color: "#9ca3af" }}>none</span>}
-                </td>
+        <p style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Alert pipeline</p>
+        <Card>
+          <table>
+            <thead>
+              <tr>
+                <th>Period</th>
+                {["critical", "high", "medium", "low"].map((s) => (
+                  <th key={s} style={{ color: SEVERITY_COLOR[s] }}>{s}</th>
+                ))}
+                <th>Total</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {alertPeriods.map(([label, bucket]) => {
+                const total = Object.values(bucket).reduce<number>((s, n) => s + (n ?? 0), 0);
+                return (
+                  <tr key={label}>
+                    <td style={{ color: "#64748b", fontWeight: 500, fontSize: 13 }}>{label}</td>
+                    {["critical", "high", "medium", "low"].map((sev) => (
+                      <td key={sev} style={{ color: (bucket as Record<string, number>)[sev] ? SEVERITY_COLOR[sev] : "#d1d5db", fontWeight: 600, fontSize: 15 }}>
+                        {(bucket as Record<string, number>)[sev] ?? 0}
+                      </td>
+                    ))}
+                    <td style={{ fontWeight: 600, color: "#374151" }}>{total}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Card>
       </section>
 
       {/* Stale connections */}
       {stale_connections.length > 0 && (
         <section>
-          <h3 style={{ marginBottom: 12, color: "#d97706" }}>Stale connections (not synced &gt; 1 h)</h3>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-            <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
-                <th style={{ padding: "6px 12px 6px 0" }}>Gmail</th>
-                <th style={{ padding: "6px 12px" }}>Child</th>
-                <th style={{ padding: "6px 0" }}>Last synced</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stale_connections.map((c) => (
-                <tr key={c.gmail_address} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                  <td style={{ padding: "7px 12px 7px 0" }}>{c.gmail_address}</td>
-                  <td style={{ padding: "7px 12px" }}>{c.child_name}</td>
-                  <td style={{ padding: "7px 0", color: "#6b7280" }}>
-                    {c.last_synced_at ? new Date(c.last_synced_at).toLocaleString() : "never"}
-                  </td>
+          <p style={{ fontSize: 11, fontWeight: 700, color: "#d97706", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>
+            ⚠ Stale connections (not synced &gt;1 h)
+          </p>
+          <Card>
+            <table>
+              <thead>
+                <tr>
+                  <th>Gmail address</th>
+                  <th>Child</th>
+                  <th>Last synced</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {stale_connections.map((c) => (
+                  <tr key={c.gmail_address}>
+                    <td style={{ fontFamily: "monospace", fontSize: 13 }}>{c.gmail_address}</td>
+                    <td>{c.child_name}</td>
+                    <td style={{ color: "#94a3b8", fontSize: 13 }}>{c.last_synced_at ? new Date(c.last_synced_at).toLocaleString() : "never"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
         </section>
       )}
 
       {/* Recent failures */}
       {recent_failures.length > 0 && (
         <section>
-          <h3 style={{ marginBottom: 12, color: "#dc2626" }}>Recent task failures</h3>
+          <p style={{ fontSize: 11, fontWeight: 700, color: "#dc2626", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>
+            Recent task failures
+          </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {recent_failures.map((f, i) => (
-              <div key={i} style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, padding: "10px 14px", fontSize: 13 }}>
-                <span style={{ fontWeight: 600 }}>{f.task_name}</span>
-                <span style={{ color: "#6b7280", marginLeft: 8 }}>{new Date(f.created_at).toLocaleString()}</span>
-                {f.error && <p style={{ margin: "4px 0 0", color: "#dc2626" }}>{f.error}</p>}
+              <div key={i} style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "12px 16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: f.error ? 6 : 0 }}>
+                  <span style={{ fontWeight: 600, fontSize: 13, fontFamily: "monospace" }}>{f.task_name}</span>
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>{new Date(f.created_at).toLocaleString()}</span>
+                </div>
+                {f.error && <p style={{ fontSize: 13, color: "#dc2626", margin: 0 }}>{f.error}</p>}
               </div>
             ))}
           </div>
@@ -154,44 +209,38 @@ function EventsTab() {
 
   useEffect(() => {
     setLoading(true);
-    adminApi.getEvents(page).then((r) => {
-      setItems(r.data);
-      setTotal(r.meta.total);
-      setLoading(false);
-    });
+    adminApi.getEvents(page).then((r) => { setItems(r.data); setTotal(r.meta.total); setLoading(false); });
   }, [page]);
 
   return (
     <div>
-      {loading ? (
-        <p style={{ color: "#6b7280" }}>Loading…</p>
-      ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-          <thead>
-            <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
-              <th style={{ padding: "6px 12px 6px 0", whiteSpace: "nowrap" }}>Time</th>
-              <th style={{ padding: "6px 12px" }}>Type</th>
-              <th style={{ padding: "6px 0" }}>Description</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((e, i) => (
-              <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                <td style={{ padding: "8px 12px 8px 0", color: "#6b7280", whiteSpace: "nowrap" }}>
-                  {new Date(e.ts).toLocaleString()}
-                </td>
-                <td style={{ padding: "8px 12px" }}><EventTypeBadge type={e.type} /></td>
-                <td style={{ padding: "8px 0" }}>{e.description}</td>
+      <Card>
+        {loading ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Loading…</div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Type</th>
+                <th>Description</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 16, fontSize: 14 }}>
-        <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={{ cursor: "pointer" }}>← Prev</button>
-        <span style={{ color: "#6b7280" }}>Page {page} · {total} total</span>
-        <button onClick={() => setPage((p) => p + 1)} disabled={page * 50 >= total} style={{ cursor: "pointer" }}>Next →</button>
-      </div>
+            </thead>
+            <tbody>
+              {items.length === 0 ? (
+                <tr><td colSpan={3} style={{ textAlign: "center", color: "#94a3b8", padding: 32 }}>No events</td></tr>
+              ) : items.map((e, i) => (
+                <tr key={i}>
+                  <td style={{ color: "#94a3b8", fontSize: 13, whiteSpace: "nowrap" }}>{new Date(e.ts).toLocaleString()}</td>
+                  <td><TypeBadge type={e.type} /></td>
+                  <td style={{ color: "#374151" }}>{e.description}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+      <Pagination page={page} total={total} perPage={50} onChange={setPage} />
     </div>
   );
 }
@@ -207,73 +256,60 @@ function TasksTab() {
 
   useEffect(() => {
     setLoading(true);
-    adminApi.getTasks(page, filter).then((r) => {
-      setItems(r.data);
-      setTotal(r.meta.total);
-      setLoading(false);
-    });
+    adminApi.getTasks(page, filter).then((r) => { setItems(r.data); setTotal(r.meta.total); setLoading(false); });
   }, [page, filter]);
 
   const setFilterAndReset = (f: string | undefined) => { setFilter(f); setPage(1); };
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        {(["All", "Failures"] as const).map((label) => {
-          const val = label === "All" ? undefined : "failure";
-          const active = filter === val;
-          return (
-            <button key={label} onClick={() => setFilterAndReset(val)}
-              style={{ padding: "4px 14px", cursor: "pointer", borderRadius: 4,
-                background: active ? "#2563eb" : "transparent",
-                color: active ? "#fff" : "#374151",
-                border: active ? "none" : "1px solid #d1d5db" }}>
-              {label}
-            </button>
-          );
-        })}
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {([["All", undefined], ["Failures", "failure"]] as const).map(([label, val]) => (
+          <button key={label} onClick={() => setFilterAndReset(val)}
+            style={{
+              padding: "5px 14px", borderRadius: 99, fontSize: 13,
+              background: filter === val ? "#2563eb" : "#fff",
+              color: filter === val ? "#fff" : "#64748b",
+              border: filter === val ? "1px solid #2563eb" : "1px solid #e2e8f0",
+              fontWeight: filter === val ? 600 : 400,
+            }}>
+            {label}
+          </button>
+        ))}
       </div>
-
-      {loading ? (
-        <p style={{ color: "#6b7280" }}>Loading…</p>
-      ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-          <thead>
-            <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
-              <th style={{ padding: "6px 12px 6px 0" }}>Task</th>
-              <th style={{ padding: "6px 12px" }}>Status</th>
-              <th style={{ padding: "6px 12px" }}>Duration</th>
-              <th style={{ padding: "6px 12px" }}>Error</th>
-              <th style={{ padding: "6px 0" }}>Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((t) => (
-              <tr key={t.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                <td style={{ padding: "8px 12px 8px 0", fontFamily: "monospace" }}>{t.task_name}</td>
-                <td style={{ padding: "8px 12px" }}><StatusBadge status={t.status} /></td>
-                <td style={{ padding: "8px 12px", color: "#6b7280" }}>
-                  {t.duration_ms != null ? `${t.duration_ms} ms` : "—"}
-                </td>
-                <td style={{ padding: "8px 12px", color: "#dc2626", maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {t.error ?? "—"}
-                </td>
-                <td style={{ padding: "8px 0", color: "#6b7280", whiteSpace: "nowrap" }}>
-                  {new Date(t.created_at).toLocaleString()}
-                </td>
+      <Card>
+        {loading ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Loading…</div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Task</th>
+                <th>Status</th>
+                <th>Duration</th>
+                <th>Error</th>
+                <th>Time</th>
               </tr>
-            ))}
-            {items.length === 0 && (
-              <tr><td colSpan={5} style={{ padding: 24, color: "#9ca3af", textAlign: "center" }}>No records</td></tr>
-            )}
-          </tbody>
-        </table>
-      )}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 16, fontSize: 14 }}>
-        <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={{ cursor: "pointer" }}>← Prev</button>
-        <span style={{ color: "#6b7280" }}>Page {page} · {total} total</span>
-        <button onClick={() => setPage((p) => p + 1)} disabled={page * 50 >= total} style={{ cursor: "pointer" }}>Next →</button>
-      </div>
+            </thead>
+            <tbody>
+              {items.length === 0 ? (
+                <tr><td colSpan={5} style={{ textAlign: "center", color: "#94a3b8", padding: 32 }}>No records</td></tr>
+              ) : items.map((t) => (
+                <tr key={t.id}>
+                  <td style={{ fontFamily: "monospace", fontSize: 12, color: "#374151" }}>{t.task_name}</td>
+                  <td><StatusBadge status={t.status} /></td>
+                  <td style={{ color: "#94a3b8", fontSize: 13 }}>{t.duration_ms != null ? `${t.duration_ms} ms` : "—"}</td>
+                  <td style={{ color: "#dc2626", fontSize: 12, maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {t.error ?? <span style={{ color: "#d1d5db" }}>—</span>}
+                  </td>
+                  <td style={{ color: "#94a3b8", fontSize: 13, whiteSpace: "nowrap" }}>{new Date(t.created_at).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+      <Pagination page={page} total={total} perPage={50} onChange={setPage} />
     </div>
   );
 }
@@ -283,30 +319,37 @@ function TasksTab() {
 export default function Admin() {
   const [tab, setTab] = useState<Tab>("overview");
 
-  const tabStyle = (t: Tab) => ({
-    padding: "8px 18px",
-    cursor: "pointer" as const,
-    fontWeight: tab === t ? 600 : 400,
-    color: tab === t ? "#2563eb" : "#374151",
-    background: "none",
-    border: "none",
-    borderBottom: tab === t ? "2px solid #2563eb" : "2px solid transparent",
-    fontSize: 14,
-  });
-
   return (
-    <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
-      <h2 style={{ marginBottom: 20 }}>Admin</h2>
+    <div style={{ padding: "28px 24px", maxWidth: 1100, margin: "0 auto" }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ marginBottom: 4 }}>Admin</h1>
+        <p style={{ color: "#64748b", fontSize: 14 }}>System health, events, and task logs.</p>
+      </div>
 
-      <div style={{ display: "flex", borderBottom: "1px solid #e5e7eb", marginBottom: 24 }}>
-        <button style={tabStyle("overview")} onClick={() => setTab("overview")}>Overview</button>
-        <button style={tabStyle("events")} onClick={() => setTab("events")}>Events</button>
-        <button style={tabStyle("tasks")} onClick={() => setTab("tasks")}>Tasks</button>
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #e2e8f0", marginBottom: 24 }}>
+        {(["overview", "events", "tasks"] as Tab[]).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            style={{
+              padding: "10px 20px", background: "none", border: "none",
+              borderBottom: tab === t ? "2px solid #2563eb" : "2px solid transparent",
+              color: tab === t ? "#2563eb" : "#64748b",
+              fontWeight: tab === t ? 600 : 400,
+              fontSize: 14, cursor: "pointer",
+              textTransform: "capitalize",
+              marginBottom: -1,
+            }}
+          >
+            {t}
+          </button>
+        ))}
       </div>
 
       {tab === "overview" && <OverviewTab />}
-      {tab === "events" && <EventsTab />}
-      {tab === "tasks" && <TasksTab />}
+      {tab === "events"   && <EventsTab />}
+      {tab === "tasks"    && <TasksTab />}
     </div>
   );
 }
