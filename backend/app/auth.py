@@ -37,11 +37,11 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
-def create_access_token(parent_id: uuid.UUID, email: str, is_admin: bool = False) -> str:
+def create_access_token(parent_id: uuid.UUID, email: str, is_admin: bool = False, is_developer: bool = False) -> str:
     _load_keys()
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
     return jwt.encode(
-        {"sub": str(parent_id), "email": email, "is_admin": is_admin, "exp": expire, "type": "access"},
+        {"sub": str(parent_id), "email": email, "is_admin": is_admin, "is_developer": is_developer, "exp": expire, "type": "access"},
         _private_key,
         algorithm=settings.jwt_algorithm,
     )
@@ -105,4 +105,12 @@ async def get_current_admin(
 ) -> "Parent":
     if not parent.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
+    return parent
+
+
+async def get_current_developer(
+    parent: Annotated["Parent", Depends(get_current_parent)],
+) -> "Parent":
+    if not parent.is_developer:
+        raise HTTPException(status_code=403, detail="Developer access required")
     return parent

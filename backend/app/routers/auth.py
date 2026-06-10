@@ -54,7 +54,7 @@ async def register(body: RegisterRequest, response: Response, db: Annotated[Asyn
     await db.refresh(parent)
 
     _set_refresh_cookie(response, create_refresh_token(parent.id))
-    return {"access_token": create_access_token(parent.id, parent.email, parent.is_admin), "is_admin": parent.is_admin}
+    return {"access_token": create_access_token(parent.id, parent.email, parent.is_admin, parent.is_developer), "is_admin": parent.is_admin, "is_developer": parent.is_developer}
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -65,7 +65,7 @@ async def login(body: LoginRequest, response: Response, db: Annotated[AsyncSessi
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     _set_refresh_cookie(response, create_refresh_token(parent.id))
-    return {"access_token": create_access_token(parent.id, parent.email, parent.is_admin), "is_admin": parent.is_admin}
+    return {"access_token": create_access_token(parent.id, parent.email, parent.is_admin, parent.is_developer), "is_admin": parent.is_admin, "is_developer": parent.is_developer}
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -85,7 +85,7 @@ async def refresh(request: Request, db: Annotated[AsyncSession, Depends(get_db)]
     if not parent:
         raise HTTPException(status_code=401, detail="Parent not found")
 
-    return {"access_token": create_access_token(parent.id, parent.email, parent.is_admin), "is_admin": parent.is_admin}
+    return {"access_token": create_access_token(parent.id, parent.email, parent.is_admin, parent.is_developer), "is_admin": parent.is_admin, "is_developer": parent.is_developer}
 
 
 @router.post("/logout")

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import api, { getIsAdmin } from "@/api/client";
+import api, { getIsAdmin, getIsDeveloper } from "@/api/client";
 
 export function NavBar() {
   const navigate = useNavigate();
@@ -16,6 +16,7 @@ export function NavBar() {
       <Link to="/alerts">Alerts</Link>
       <Link to="/settings">Settings</Link>
       {getIsAdmin() && <Link to="/admin">Admin</Link>}
+      {getIsDeveloper() && <Link to="/developer" style={{ color: "#7c3aed" }}>Dev</Link>}
       <button onClick={logout} style={{ marginLeft: "auto", cursor: "pointer" }}>
         Logout
       </button>
