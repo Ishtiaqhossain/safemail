@@ -9,6 +9,8 @@ import Settings from "@/pages/Settings";
 import { isAuthenticated, tryRefresh, getIsAdmin, getIsDeveloper } from "@/api/client";
 import Admin from "@/pages/Admin";
 import Developer from "@/pages/Developer";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -64,6 +66,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/dashboard" element={<ProtectedRoute authStatus={authStatus}><Dashboard /></ProtectedRoute>} />
         <Route path="/alerts" element={<ProtectedRoute authStatus={authStatus}><AlertFeed /></ProtectedRoute>} />
         <Route path="/alerts/:id" element={<ProtectedRoute authStatus={authStatus}><AlertDetail /></ProtectedRoute>} />

@@ -42,6 +42,32 @@ def send_alert_email(parent_email: str, child_name: str, alert: dict) -> None:
     SendGridAPIClient(settings.sendgrid_api_key).send(message)
 
 
+def send_password_reset_email(to_email: str, reset_url: str) -> None:
+    from sendgrid import SendGridAPIClient
+    from sendgrid.helpers.mail import Mail
+
+    html = f"""
+<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2 style="color:#0f172a">Reset your SafeMail password</h2>
+  <p>We received a request to reset the password for your account.</p>
+  <p style="margin:24px 0">
+    <a href="{reset_url}"
+       style="background:#2563eb;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-weight:600">
+      Reset password
+    </a>
+  </p>
+  <p style="color:#64748b;font-size:13px">This link expires in 30 minutes. If you didn't request a password reset, you can safely ignore this email.</p>
+</div>"""
+
+    message = Mail(
+        from_email="noreply@safemail.com",
+        to_emails=to_email,
+        subject="Reset your SafeMail password",
+        html_content=html,
+    )
+    SendGridAPIClient(settings.sendgrid_api_key).send(message)
+
+
 def send_push_notification(fcm_token: str, child_name: str, alert: dict) -> None:
     if not settings.fcm_service_account_json or not fcm_token:
         return

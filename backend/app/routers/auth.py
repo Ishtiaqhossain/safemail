@@ -17,10 +17,11 @@ from app.models.gmail_connection import GmailConnection
 from app.auth import (
     hash_password, verify_password,
     create_access_token, create_refresh_token,
-    create_oauth_state_token, decode_token, get_current_parent,
+    create_oauth_state_token, create_password_reset_token,
+    decode_token, get_current_parent,
 )
 from app.services.crypto import encrypt_token
-from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
+from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, ForgotPasswordRequest, ResetPasswordRequest
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
@@ -92,6 +93,45 @@ async def refresh(request: Request, db: Annotated[AsyncSession, Depends(get_db)]
 async def logout(response: Response):
     response.delete_cookie("refresh_token")
     return {"detail": "Logged out"}
+
+
+@router.post("/forgot-password", status_code=200)
+async def forgot_password(body: ForgotPasswordRequest, db: Annotated[AsyncSession, Depends(get_db)]):
+    result = await db.execute(select(Parent).where(Parent.email == body.email))
+    parent = result.scalar_one_or_none()
+    if parent:
+        from app.services.notifications import send_password_reset_email
+        token = create_password_reset_token(parent.id, parent.email)
+        reset_url = f"{settings.frontend_url}/reset-password?token={token}"
+        try:
+            send_password_reset_email(parent.email, reset_url)
+        except Exception:
+            pass  # never reveal send failures to caller
+    return {"detail": "If an account with that email exists, a reset link has been sent."}
+
+
+@router.post("/reset-password", status_code=200)
+async def reset_password(body: ResetPasswordRequest, db: Annotated[AsyncSession, Depends(get_db)]):
+    invalid = HTTPException(status_code=400, detail="Reset link is invalid or has expired.")
+    try:
+        payload = decode_token(body.token)
+        if payload.get("type") != "password_reset":
+            raise invalid
+        parent_id = payload.get("sub")
+    except Exception:
+        raise invalid
+
+    result = await db.execute(select(Parent).where(Parent.id == uuid.UUID(parent_id)))
+    parent = result.scalar_one_or_none()
+    if not parent:
+        raise invalid
+
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=422, detail="Password must be at least 8 characters.")
+
+    parent.password_hash = hash_password(body.new_password)
+    await db.commit()
+    return {"detail": "Password updated. You can now log in."}
 
 
 @router.get("/google/connect")

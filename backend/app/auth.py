@@ -57,6 +57,16 @@ def create_refresh_token(parent_id: uuid.UUID) -> str:
     )
 
 
+def create_password_reset_token(parent_id: uuid.UUID, email: str) -> str:
+    _load_keys()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=30)
+    return jwt.encode(
+        {"sub": str(parent_id), "email": email, "exp": expire, "type": "password_reset"},
+        _private_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+
 def create_oauth_state_token(parent_id: uuid.UUID, child_id: uuid.UUID) -> str:
     _load_keys()
     expire = datetime.now(timezone.utc) + timedelta(minutes=10)

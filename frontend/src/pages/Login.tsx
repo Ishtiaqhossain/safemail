@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
 import { setAccessToken, setIsAdmin, setIsDeveloper } from "@/api/client";
 
 export default function Login({ onLogin }: { onLogin?: () => void }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const resetSuccess = searchParams.get("reset") === "true";
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -59,6 +61,12 @@ export default function Login({ onLogin }: { onLogin?: () => void }) {
         maxWidth: 400,
         boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
       }}>
+        {resetSuccess && (
+          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 7, padding: "10px 14px", color: "#16a34a", fontSize: 13, marginBottom: 20 }}>
+            Password updated. You can now sign in with your new password.
+          </div>
+        )}
+
         <h2 style={{ marginBottom: 4, fontSize: 18 }}>
           {mode === "login" ? "Welcome back" : "Create your account"}
         </h2>
@@ -137,6 +145,13 @@ export default function Login({ onLogin }: { onLogin?: () => void }) {
               required
               style={{ width: "100%" }}
             />
+            {mode === "login" && (
+              <div style={{ textAlign: "right", marginTop: 4 }}>
+                <Link to="/forgot-password" style={{ fontSize: 12, color: "#64748b" }}>
+                  Forgot password?
+                </Link>
+              </div>
+            )}
           </div>
 
           {error && (

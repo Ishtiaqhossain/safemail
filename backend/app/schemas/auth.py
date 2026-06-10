@@ -17,3 +17,12 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     is_admin: bool = False
     is_developer: bool = False
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
