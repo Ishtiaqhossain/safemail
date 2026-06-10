@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, cast, Integer
 
 from app.database import get_db
 from app.auth import get_current_admin
@@ -14,6 +14,59 @@ from app.models.alert import Alert
 from app.models.task_log import TaskLog
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+# Pricing for claude-sonnet-4-6 (USD per million tokens)
+INPUT_TOKEN_PRICE_PER_M = 3.00
+OUTPUT_TOKEN_PRICE_PER_M = 15.00
+
+
+async def _llm_usage(db: AsyncSession, since: datetime | None = None) -> dict:
+    # Only count rows that carry token data, so logs written before token
+    # tracking existed don't show up as zero-cost calls.
+    input_tok_col = cast(TaskLog.meta["input_tokens"].astext, Integer)
+    output_tok_col = cast(TaskLog.meta["output_tokens"].astext, Integer)
+    filters = [
+        TaskLog.task_name == "analyze_message",
+        TaskLog.status == "success",
+        input_tok_col.isnot(None),
+    ]
+    if since:
+        filters.append(TaskLog.created_at >= since)
+
+    row = (await db.execute(
+        select(
+            func.count().label("calls"),
+            func.coalesce(func.sum(input_tok_col), 0).label("input_tokens"),
+            func.coalesce(func.sum(output_tok_col), 0).label("output_tokens"),
+        ).where(and_(*filters))
+    )).one()
+
+    cost = (row.input_tokens / 1_000_000 * INPUT_TOKEN_PRICE_PER_M
+            + row.output_tokens / 1_000_000 * OUTPUT_TOKEN_PRICE_PER_M)
+    return {
+        "calls": row.calls,
+        "input_tokens": row.input_tokens,
+        "output_tokens": row.output_tokens,
+        "cost_usd": round(cost, 4),
+    }
+
+
+@router.get("/llm-stats")
+async def llm_stats(
+    _: Annotated[Parent, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    now = datetime.now(timezone.utc)
+    return {
+        "model": "claude-sonnet-4-6",
+        "pricing": {
+            "input_per_million": INPUT_TOKEN_PRICE_PER_M,
+            "output_per_million": OUTPUT_TOKEN_PRICE_PER_M,
+        },
+        "last_7d": await _llm_usage(db, now - timedelta(days=7)),
+        "last_30d": await _llm_usage(db, now - timedelta(days=30)),
+        "all_time": await _llm_usage(db),
+    }
 
 
 @router.get("/overview")

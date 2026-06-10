@@ -85,6 +85,21 @@ export interface TaskLogEntry {
   created_at: string;
 }
 
+export interface LlmUsagePeriod {
+  calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+}
+
+export interface LlmStats {
+  model: string;
+  pricing: { input_per_million: number; output_per_million: number };
+  last_7d: LlmUsagePeriod;
+  last_30d: LlmUsagePeriod;
+  all_time: LlmUsagePeriod;
+}
+
 export interface WeeklyStats {
   week_start: string;
   total_emails: number;
