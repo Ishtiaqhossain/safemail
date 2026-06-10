@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { adminApi } from "@/api/admin";
-import type { AdminOverview, AdminEvent, TaskLogEntry, LlmStats } from "@/types";
+import type { AdminOverview, AdminEvent, TaskLogEntry, LlmStats, AllowedEmail } from "@/types";
 
-type Tab = "overview" | "llm" | "events" | "tasks";
+type Tab = "overview" | "llm" | "allowlist" | "events" | "tasks";
 
 const fmtNum = (n: number) => n.toLocaleString();
 const fmtCost = (n: number) => (n === 0 ? "$0.00" : n < 0.01 ? "< $0.01" : `$${n.toFixed(n >= 1 ? 2 : 4)}`);
@@ -365,6 +365,102 @@ function LlmTab() {
   );
 }
 
+// ── Allowlist Tab ─────────────────────────────────────────────────────────────
+
+function AllowlistTab() {
+  const [items, setItems] = useState<AllowedEmail[] | null>(null);
+  const [email, setEmail] = useState("");
+  const [note, setNote] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = () => adminApi.getAllowlist().then(setItems).catch(() => setItems([]));
+  useEffect(() => { load(); }, []);
+
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setAdding(true); setError(null);
+    try {
+      await adminApi.addAllowedEmail(email.trim(), note.trim() || undefined);
+      setEmail(""); setNote("");
+      await load();
+    } catch (err: unknown) {
+      setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to add email");
+    } finally { setAdding(false); }
+  };
+
+  const remove = async (entry: AllowedEmail) => {
+    if (!confirm(`Remove ${entry.email} from the allowlist? They will no longer be able to log in.`)) return;
+    await adminApi.removeAllowedEmail(entry.id);
+    await load();
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <p style={{ fontSize: 13, color: "#64748b", margin: 0 }}>
+        While invite-only mode is on, only these emails can register or log in (admins are always exempt).
+      </p>
+
+      <Card style={{ padding: "16px 18px" }}>
+        <form onSubmit={add} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ flex: "1 1 220px" }}>
+            <label style={{ fontSize: 12, fontWeight: 600, display: "block", color: "#374151", marginBottom: 4 }}>Email</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                   placeholder="alpha-user@example.com" style={{ width: "100%" }} required />
+          </div>
+          <div style={{ flex: "1 1 180px" }}>
+            <label style={{ fontSize: 12, fontWeight: 600, display: "block", color: "#374151", marginBottom: 4 }}>Note (optional)</label>
+            <input value={note} onChange={(e) => setNote(e.target.value)}
+                   placeholder="e.g. cohort 1 / referred by Jane" style={{ width: "100%" }} />
+          </div>
+          <button type="submit" disabled={adding}
+                  style={{ padding: "8px 18px", background: "#2563eb", color: "#fff", border: "none",
+                           borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            {adding ? "Adding…" : "Add"}
+          </button>
+        </form>
+        {error && <p style={{ color: "#dc2626", fontSize: 13, margin: "8px 0 0" }}>{error}</p>}
+      </Card>
+
+      <Card>
+        {items === null ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Loading…</div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Note</th>
+                <th>Added</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.length === 0 ? (
+                <tr><td colSpan={4} style={{ textAlign: "center", color: "#94a3b8", padding: 32 }}>No emails on the allowlist yet</td></tr>
+              ) : items.map((it) => (
+                <tr key={it.id}>
+                  <td style={{ fontFamily: "monospace", fontSize: 13 }}>{it.email}</td>
+                  <td style={{ color: "#64748b", fontSize: 13 }}>{it.note ?? "—"}</td>
+                  <td style={{ color: "#94a3b8", fontSize: 13, whiteSpace: "nowrap" }}>{new Date(it.created_at).toLocaleDateString()}</td>
+                  <td style={{ textAlign: "right" }}>
+                    <button onClick={() => remove(it)}
+                            style={{ padding: "4px 10px", background: "#fff", border: "1px solid #fecaca",
+                                     color: "#dc2626", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Admin() {
@@ -379,7 +475,7 @@ export default function Admin() {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #e2e8f0", marginBottom: 24 }}>
-        {(["overview", "llm", "events", "tasks"] as Tab[]).map((t) => (
+        {(["overview", "llm", "allowlist", "events", "tasks"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -398,10 +494,11 @@ export default function Admin() {
         ))}
       </div>
 
-      {tab === "overview" && <OverviewTab />}
-      {tab === "llm"      && <LlmTab />}
-      {tab === "events"   && <EventsTab />}
-      {tab === "tasks"    && <TasksTab />}
+      {tab === "overview"  && <OverviewTab />}
+      {tab === "llm"       && <LlmTab />}
+      {tab === "allowlist" && <AllowlistTab />}
+      {tab === "events"    && <EventsTab />}
+      {tab === "tasks"     && <TasksTab />}
     </div>
   );
 }
