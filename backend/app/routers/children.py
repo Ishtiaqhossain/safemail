@@ -38,8 +38,10 @@ async def create_child(
     child = Child(parent_id=current_parent.id, display_name=body.display_name, birth_year=body.birth_year)
     db.add(child)
     await db.commit()
-    await db.refresh(child)
-    return child
+    result = await db.execute(
+        select(Child).where(Child.id == child.id).options(selectinload(Child.gmail_connections))
+    )
+    return result.scalar_one()
 
 
 @router.patch("/{child_id}", response_model=ChildResponse)

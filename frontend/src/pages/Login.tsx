@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { setAccessToken } from "@/api/client";
 
-export default function Login() {
+export default function Login({ onLogin }: { onLogin?: () => void }) {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
@@ -19,6 +19,7 @@ export default function Login() {
       const body = mode === "login" ? { email, password } : { email, password, full_name: fullName };
       const { data } = await axios.post(endpoint, body, { withCredentials: true });
       setAccessToken(data.access_token);
+      onLogin?.();
       navigate("/dashboard");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Something went wrong";

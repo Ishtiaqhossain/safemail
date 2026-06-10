@@ -7,6 +7,7 @@ export default function Settings() {
   const [children, setChildren] = useState<Child[]>([]);
   const [newName, setNewName] = useState("");
   const [newYear, setNewYear] = useState("");
+  const [addError, setAddError] = useState("");
   const [prefs, setPrefs] = useState<Record<string, AlertPreference>>({});
 
   const load = () => childrenApi.list().then(setChildren);
@@ -24,10 +25,16 @@ export default function Settings() {
   const addChild = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
-    await childrenApi.create(newName.trim(), newYear ? parseInt(newYear) : undefined);
-    setNewName("");
-    setNewYear("");
-    load();
+    setAddError("");
+    try {
+      await childrenApi.create(newName.trim(), newYear ? parseInt(newYear) : undefined);
+      setNewName("");
+      setNewYear("");
+      load();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to add child";
+      setAddError(msg);
+    }
   };
 
   const deleteChild = async (id: string) => {
@@ -60,6 +67,7 @@ export default function Settings() {
             Add
           </button>
         </form>
+        {addError && <p style={{ color: "#dc2626", marginTop: 8, fontSize: 14 }}>{addError}</p>}
       </section>
 
       <section>
