@@ -94,6 +94,35 @@ def send_password_reset_email(to_email: str, reset_url: str) -> None:
     SendGridAPIClient(settings.sendgrid_api_key).send(message)
 
 
+def send_reconnect_email(to_email: str, child_name: str, gmail_address: str, reconnect_url: str) -> None:
+    from sendgrid import SendGridAPIClient
+    from sendgrid.helpers.mail import Mail
+
+    html = f"""
+<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2 style="color:#0f172a">Action needed: reconnect {child_name}'s Gmail</h2>
+  <p>SafeMail has lost access to <strong>{gmail_address}</strong>, so we are no
+     longer monitoring {child_name}'s email. This usually happens when the Google
+     permission is revoked or expires.</p>
+  <p style="color:#b91c1c;font-weight:600">Until you reconnect, no safety alerts will be sent for this account.</p>
+  <p style="margin:24px 0">
+    <a href="{reconnect_url}"
+       style="background:#2563eb;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-weight:600">
+      Reconnect Gmail
+    </a>
+  </p>
+  <p style="color:#64748b;font-size:13px">If you intentionally disconnected this account, you can ignore this email.</p>
+</div>"""
+
+    message = Mail(
+        from_email="noreply@safemail.com",
+        to_emails=to_email,
+        subject=f"[SafeMail] Reconnect needed — {child_name}'s email is no longer monitored",
+        html_content=html,
+    )
+    SendGridAPIClient(settings.sendgrid_api_key).send(message)
+
+
 def send_push_notification(fcm_token: str, child_name: str, alert: dict) -> None:
     if not settings.fcm_service_account_json or not fcm_token:
         return

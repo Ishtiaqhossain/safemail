@@ -1,3 +1,9 @@
+import os
+
+# Disable auth rate limiting before the app (and its cached settings) load,
+# so repeated login/register calls in tests aren't throttled.
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
+
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
