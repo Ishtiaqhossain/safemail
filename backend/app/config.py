@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     fcm_service_account_json: str = ""
 
     frontend_url: str = "http://localhost:3000"
+    cookie_secure: bool = False
 
     confidence_threshold: float = 0.70
     max_body_length: int = 8000

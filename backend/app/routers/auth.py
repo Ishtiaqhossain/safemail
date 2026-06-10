@@ -109,7 +109,7 @@ async def google_connect(
     flow = Flow.from_client_config(_GOOGLE_CLIENT_CONFIG(), scopes=GMAIL_SCOPES, redirect_uri=settings.google_redirect_uri)
     state = create_oauth_state_token(current_parent.id, uuid.UUID(child_id))
     auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent", state=state)
-    return RedirectResponse(auth_url)
+    return {"auth_url": auth_url}
 
 
 @router.get("/google/callback")
@@ -176,6 +176,6 @@ async def disconnect_gmail(
 def _set_refresh_cookie(response: Response, token: str) -> None:
     response.set_cookie(
         "refresh_token", token,
-        httponly=True, secure=True, samesite="strict",
+        httponly=True, secure=settings.cookie_secure, samesite="strict",
         max_age=60 * 60 * 24 * 30,
     )
