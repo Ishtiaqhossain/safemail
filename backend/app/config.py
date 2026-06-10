@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     max_body_length: int = 8000
     alert_poll_interval_minutes: int = 5
 
+    # Auth rate limiting (slowapi, Redis-backed). Disabled in the test suite.
+    rate_limit_enabled: bool = True
+
 
 @lru_cache
 def get_settings() -> Settings:

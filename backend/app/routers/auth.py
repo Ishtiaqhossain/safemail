@@ -23,6 +23,10 @@ from app.auth import (
 )
 from app.services.crypto import encrypt_token
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, ForgotPasswordRequest, ResetPasswordRequest
+from app.ratelimit import (
+    limiter, LOGIN_LIMIT, REGISTER_LIMIT, REFRESH_LIMIT,
+    FORGOT_PASSWORD_LIMIT, RESET_PASSWORD_LIMIT, RESEND_VERIFICATION_LIMIT,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
@@ -45,7 +49,8 @@ _GOOGLE_CLIENT_CONFIG = lambda: {  # noqa: E731
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterRequest, response: Response, db: Annotated[AsyncSession, Depends(get_db)]):
+@limiter.limit(REGISTER_LIMIT)
+async def register(request: Request, body: RegisterRequest, response: Response, db: Annotated[AsyncSession, Depends(get_db)]):
     existing = await db.execute(select(Parent).where(Parent.email == body.email))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Email already registered")
@@ -74,7 +79,8 @@ async def register(body: RegisterRequest, response: Response, db: Annotated[Asyn
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, response: Response, db: Annotated[AsyncSession, Depends(get_db)]):
+@limiter.limit(LOGIN_LIMIT)
+async def login(request: Request, body: LoginRequest, response: Response, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(select(Parent).where(Parent.email == body.email))
     parent = result.scalar_one_or_none()
     if not parent or not verify_password(body.password, parent.password_hash):
@@ -90,6 +96,7 @@ async def login(body: LoginRequest, response: Response, db: Annotated[AsyncSessi
 
 
 @router.post("/refresh", response_model=TokenResponse)
+@limiter.limit(REFRESH_LIMIT)
 async def refresh(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
     token = request.cookies.get("refresh_token")
     if not token:
@@ -142,7 +149,9 @@ async def verify_email(token: str, db: Annotated[AsyncSession, Depends(get_db)])
 
 
 @router.post("/resend-verification", status_code=200)
+@limiter.limit(RESEND_VERIFICATION_LIMIT)
 async def resend_verification(
+    request: Request,
     current_parent: Annotated[Parent, Depends(get_current_parent)],
 ):
     if current_parent.is_email_verified:
@@ -158,7 +167,8 @@ async def resend_verification(
 
 
 @router.post("/forgot-password", status_code=200)
-async def forgot_password(body: ForgotPasswordRequest, db: Annotated[AsyncSession, Depends(get_db)]):
+@limiter.limit(FORGOT_PASSWORD_LIMIT)
+async def forgot_password(request: Request, body: ForgotPasswordRequest, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(select(Parent).where(Parent.email == body.email))
     parent = result.scalar_one_or_none()
     if parent:
@@ -173,7 +183,8 @@ async def forgot_password(body: ForgotPasswordRequest, db: Annotated[AsyncSessio
 
 
 @router.post("/reset-password", status_code=200)
-async def reset_password(body: ResetPasswordRequest, db: Annotated[AsyncSession, Depends(get_db)]):
+@limiter.limit(RESET_PASSWORD_LIMIT)
+async def reset_password(request: Request, body: ResetPasswordRequest, db: Annotated[AsyncSession, Depends(get_db)]):
     invalid = HTTPException(status_code=400, detail="Reset link is invalid or has expired.")
     try:
         payload = decode_token(body.token)

@@ -78,11 +78,39 @@ def poll_connection(self, connection_id: str):
 
         except Exception as exc:
             logger.error("Poll failed for connection %s: %s", connection_id, exc)
-            if "invalid_grant" in str(exc).lower() or "401" in str(exc):
+            is_auth_failure = "invalid_grant" in str(exc).lower() or "401" in str(exc)
+            if is_auth_failure:
                 conn.status = "error"
                 db.commit()
+                # Token revoked/expired — the parent must reconnect, so tell them.
+                _notify_reconnect_needed(db, conn)
             write_task_log(db, "poll_connection", "failure",
                            error=str(exc), duration_ms=timer.elapsed_ms(),
-                           meta={"connection_id": connection_id})
-            if "invalid_grant" not in str(exc).lower() and "401" not in str(exc):
+                           meta={"connection_id": connection_id, "auth_failure": is_auth_failure})
+            if not is_auth_failure:
                 raise self.retry(exc=exc, countdown=60)
+
+
+def _notify_reconnect_needed(db, conn: GmailConnection) -> None:
+    """Email the parent that a child's Gmail connection needs reconnecting.
+
+    Best-effort: never let a notification failure mask the original poll error.
+    Runs only on the active->error transition, so the parent is emailed once.
+    """
+    from app.models.child import Child
+    from app.models.parent import Parent
+    from app.services.notifications import send_reconnect_email
+
+    try:
+        child = db.get(Child, conn.child_id)
+        if not child:
+            return
+        parent = db.get(Parent, child.parent_id)
+        if not parent:
+            return
+        reconnect_url = f"{settings.frontend_url}/dashboard"
+        send_reconnect_email(parent.email, child.display_name, conn.gmail_address, reconnect_url)
+        write_task_log(db, "reconnect_notice", "success",
+                       meta={"connection_id": str(conn.id), "parent_email": parent.email})
+    except Exception as e:
+        logger.error("Reconnect notice failed for connection %s: %s", conn.id, e)
