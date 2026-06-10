@@ -53,6 +53,38 @@ export interface AlertPreference {
   digest_frequency: "daily" | "weekly";
 }
 
+export interface AdminOverview {
+  system: {
+    total_parents: number;
+    total_children: number;
+    connections_by_status: Partial<Record<string, number>>;
+  };
+  stale_connections: { gmail_address: string; child_name: string; last_synced_at: string | null }[];
+  alerts: {
+    last_24h: Partial<Record<Severity, number>>;
+    last_7d: Partial<Record<Severity, number>>;
+    last_30d: Partial<Record<Severity, number>>;
+  };
+  false_positive_rate: number | null;
+  recent_failures: { task_name: string; error: string | null; created_at: string; meta: Record<string, unknown> | null }[];
+}
+
+export interface AdminEvent {
+  type: string;
+  ts: string;
+  description: string;
+}
+
+export interface TaskLogEntry {
+  id: string;
+  task_name: string;
+  status: string;
+  error: string | null;
+  duration_ms: number | null;
+  meta: Record<string, unknown> | null;
+  created_at: string;
+}
+
 export interface WeeklyStats {
   week_start: string;
   total_emails: number;

@@ -3,6 +3,7 @@ import axios from "axios";
 const api = axios.create({ baseURL: "/v1", withCredentials: true });
 
 let accessToken: string | null = null;
+let adminFlag = false;
 
 export function setAccessToken(token: string) {
   accessToken = token;
@@ -10,6 +11,15 @@ export function setAccessToken(token: string) {
 
 export function clearAccessToken() {
   accessToken = null;
+  adminFlag = false;
+}
+
+export function setIsAdmin(v: boolean) {
+  adminFlag = v;
+}
+
+export function getIsAdmin() {
+  return adminFlag;
 }
 
 export function isAuthenticated() {
@@ -20,6 +30,7 @@ export async function tryRefresh(): Promise<boolean> {
   try {
     const { data } = await axios.post("/v1/auth/refresh", {}, { withCredentials: true });
     setAccessToken(data.access_token);
+    setIsAdmin(data.is_admin ?? false);
     return true;
   } catch {
     return false;

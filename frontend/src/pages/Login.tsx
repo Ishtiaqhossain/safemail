@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { setAccessToken } from "@/api/client";
+import { setAccessToken, setIsAdmin } from "@/api/client";
 
 export default function Login({ onLogin }: { onLogin?: () => void }) {
   const navigate = useNavigate();
@@ -19,6 +19,7 @@ export default function Login({ onLogin }: { onLogin?: () => void }) {
       const body = mode === "login" ? { email, password } : { email, password, full_name: fullName };
       const { data } = await axios.post(endpoint, body, { withCredentials: true });
       setAccessToken(data.access_token);
+      setIsAdmin(data.is_admin ?? false);
       onLogin?.();
       navigate("/dashboard");
     } catch (err: unknown) {

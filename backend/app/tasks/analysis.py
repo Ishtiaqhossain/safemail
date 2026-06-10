@@ -10,6 +10,7 @@ from app.models.gmail_connection import GmailConnection
 from app.models.alert_preference import AlertPreference
 from app.services.analysis import classify_email
 from app.config import get_settings
+from app.tasks.utils import write_task_log, TaskTimer
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -17,6 +18,7 @@ settings = get_settings()
 
 @celery.task(name="app.tasks.analysis.analyze_message", bind=True, max_retries=3)
 def analyze_message(self, message: dict):
+    timer = TaskTimer()
     try:
         result = classify_email(message)
     except Exception as exc:
@@ -30,7 +32,6 @@ def analyze_message(self, message: dict):
         return
 
     with SyncSessionLocal() as db:
-        # Guard: skip if this gmail_message_id already has an alert
         existing = (
             db.query(Alert)
             .filter(Alert.gmail_message_id == message["gmail_message_id"])
@@ -57,6 +58,9 @@ def analyze_message(self, message: dict):
         db.add(alert)
         db.commit()
         db.refresh(alert)
+        write_task_log(db, "analyze_message", "success",
+                       duration_ms=timer.elapsed_ms(),
+                       meta={"child_id": message["child_id"], "severity": severity, "category": result["category"]})
 
         from app.tasks.analysis import deliver_alert
         deliver_alert.delay(str(alert.id))
@@ -81,6 +85,7 @@ def deliver_alert(self, alert_id: str):
 
         immediate = pref.immediate_severities if pref else ["critical", "high"]
 
+        channels = []
         if alert.severity in immediate:
             alert_dict = {
                 "id": alert.id,
@@ -91,14 +96,18 @@ def deliver_alert(self, alert_id: str):
             }
             try:
                 send_alert_email(parent.email, child.display_name, alert_dict)
+                channels.append("email")
             except Exception as e:
                 logger.error("Email delivery failed: %s", e)
 
             if parent.fcm_token:
                 try:
                     send_push_notification(parent.fcm_token, child.display_name, alert_dict)
+                    channels.append("push")
                 except Exception as e:
                     logger.error("Push delivery failed: %s", e)
 
             alert.notified_at = datetime.now(timezone.utc)
             db.commit()
+        write_task_log(db, "deliver_alert", "success",
+                       meta={"alert_id": alert_id, "channels": channels})

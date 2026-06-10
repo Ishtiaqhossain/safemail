@@ -12,6 +12,7 @@ from app.services.gmail import (
     fetch_message, extract_message_data,
 )
 from app.config import get_settings
+from app.tasks.utils import write_task_log, TaskTimer
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -32,6 +33,7 @@ def poll_all_connections(self):
 
 @celery.task(name="app.tasks.ingestion.poll_connection", bind=True, max_retries=3)
 def poll_connection(self, connection_id: str):
+    timer = TaskTimer()
     with SyncSessionLocal() as db:
         conn = db.get(GmailConnection, connection_id)
         if not conn or conn.status != "active":
@@ -70,11 +72,17 @@ def poll_connection(self, connection_id: str):
 
             conn.last_synced_at = datetime.now(timezone.utc)
             db.commit()
+            write_task_log(db, "poll_connection", "success",
+                           duration_ms=timer.elapsed_ms(),
+                           meta={"connection_id": connection_id, "messages_fetched": len(new_ids)})
 
         except Exception as exc:
             logger.error("Poll failed for connection %s: %s", connection_id, exc)
             if "invalid_grant" in str(exc).lower() or "401" in str(exc):
                 conn.status = "error"
                 db.commit()
-            else:
+            write_task_log(db, "poll_connection", "failure",
+                           error=str(exc), duration_ms=timer.elapsed_ms(),
+                           meta={"connection_id": connection_id})
+            if "invalid_grant" not in str(exc).lower() and "401" not in str(exc):
                 raise self.retry(exc=exc, countdown=60)

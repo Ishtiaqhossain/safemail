@@ -8,6 +8,8 @@ from app.models.child import Child
 from app.models.alert import Alert
 from app.models.weekly_stats import WeeklyStats
 
+from app.tasks.utils import write_task_log, TaskTimer
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,10 +68,15 @@ def send_parent_digest(self, parent_id: str):
             subject="Your SafeMail Weekly Summary",
             html_content=html,
         )
+        timer = TaskTimer()
         try:
             SendGridAPIClient(settings.sendgrid_api_key).send(msg)
+            write_task_log(db, "send_parent_digest", "success",
+                           duration_ms=timer.elapsed_ms(), meta={"parent_id": parent_id})
         except Exception as e:
             logger.error("Digest email failed for %s: %s", parent.email, e)
+            write_task_log(db, "send_parent_digest", "failure",
+                           error=str(e), duration_ms=timer.elapsed_ms(), meta={"parent_id": parent_id})
             raise self.retry(exc=e, countdown=300)
 
 
@@ -88,8 +95,11 @@ def _build_child_section(child, stats, alerts) -> str:
 
 @celery.task(name="app.tasks.digest.cleanup_old_data")
 def cleanup_old_data():
+    timer = TaskTimer()
     cutoff = datetime.now(timezone.utc) - timedelta(days=365)
     with SyncSessionLocal() as db:
         deleted = db.query(Alert).filter(Alert.created_at < cutoff).delete()
         db.commit()
         logger.info("Deleted %d alerts older than 12 months", deleted)
+        write_task_log(db, "cleanup_old_data", "success",
+                       duration_ms=timer.elapsed_ms(), meta={"deleted_count": deleted})
