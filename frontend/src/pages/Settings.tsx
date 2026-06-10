@@ -1,7 +1,23 @@
 import { useEffect, useState } from "react";
 import { childrenApi } from "@/api/children";
 import { alertsApi } from "@/api/alerts";
-import type { Child, AlertPreference } from "@/types";
+import type { Child, AlertPreference, Severity, Category } from "@/types";
+
+const SEVERITIES: { value: Severity; label: string; color: string; bg: string }[] = [
+  { value: "critical", label: "Critical", color: "#dc2626", bg: "#fef2f2" },
+  { value: "high",     label: "High",     color: "#ea580c", bg: "#fff7ed" },
+  { value: "medium",   label: "Medium",   color: "#d97706", bg: "#fffbeb" },
+  { value: "low",      label: "Low",      color: "#16a34a", bg: "#f0fdf4" },
+];
+
+const CATEGORIES: { value: Category; label: string; icon: string }[] = [
+  { value: "self_harm",             label: "Self-Harm",          icon: "🆘" },
+  { value: "grooming",              label: "Grooming",           icon: "⚠️" },
+  { value: "bullying",              label: "Bullying",           icon: "😔" },
+  { value: "drugs_alcohol",         label: "Drugs & Alcohol",    icon: "🚫" },
+  { value: "stranger_contact",      label: "Stranger Contact",   icon: "👤" },
+  { value: "personal_info_sharing", label: "Personal Info",      icon: "🔒" },
+];
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -33,6 +49,7 @@ export default function Settings() {
   const [addError, setAddError] = useState("");
   const [addLoading, setAddLoading] = useState(false);
   const [prefs, setPrefs] = useState<Record<string, AlertPreference>>({});
+  const [savedPrefId, setSavedPrefId] = useState<string | null>(null);
 
   const load = () => childrenApi.list().then(setChildren);
 
@@ -73,6 +90,8 @@ export default function Settings() {
   const savePref = async (childId: string, pref: AlertPreference) => {
     await alertsApi.updatePreferences(childId, pref);
     setPrefs((prev) => ({ ...prev, [childId]: pref }));
+    setSavedPrefId(childId);
+    setTimeout(() => setSavedPrefId((id) => (id === childId ? null : id)), 2000);
   };
 
   return (
@@ -194,19 +213,114 @@ export default function Settings() {
 
                 {/* Preferences */}
                 {pref && (
-                  <div style={{ padding: "14px 20px" }}>
-                    <SectionLabel>Alert preferences</SectionLabel>
-                    <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-                      <span style={{ color: "#374151", fontWeight: 500 }}>Digest frequency</span>
-                      <select
-                        value={pref.digest_frequency}
-                        onChange={(e) => savePref(child.id, { ...pref, digest_frequency: e.target.value as "daily" | "weekly" })}
-                        style={{ fontSize: 13 }}
-                      >
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                      </select>
-                    </label>
+                  <div style={{ padding: "16px 20px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                      <SectionLabel>Alert preferences</SectionLabel>
+                      {savedPrefId === child.id && (
+                        <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 500 }}>✓ Saved</span>
+                      )}
+                    </div>
+
+                    {/* Immediate severities */}
+                    <div style={{ marginBottom: 18 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 3 }}>
+                        Immediate alerts
+                      </p>
+                      <p style={{ fontSize: 12, color: "#94a3b8", marginBottom: 10 }}>
+                        Send me an email right away when an alert is this severity.
+                      </p>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {SEVERITIES.map(({ value, label, color, bg }) => {
+                          const checked = pref.immediate_severities.includes(value);
+                          return (
+                            <label
+                              key={value}
+                              style={{
+                                display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
+                                background: checked ? bg : "#f8fafc",
+                                border: `1px solid ${checked ? color + "80" : "#e2e8f0"}`,
+                                borderRadius: 6, padding: "5px 12px", fontSize: 13, fontWeight: 500,
+                                color: checked ? color : "#64748b", userSelect: "none",
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                style={{ accentColor: color, width: 14, height: 14 }}
+                                onChange={() => {
+                                  const next = checked
+                                    ? pref.immediate_severities.filter((s) => s !== value)
+                                    : [...pref.immediate_severities, value];
+                                  savePref(child.id, { ...pref, immediate_severities: next });
+                                }}
+                              />
+                              {label}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Categories to monitor */}
+                    <div style={{ marginBottom: 18 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 3 }}>
+                        Categories to monitor
+                      </p>
+                      <p style={{ fontSize: 12, color: "#94a3b8", marginBottom: 10 }}>
+                        Uncheck a category to stop receiving alerts for it.
+                      </p>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 8 }}>
+                        {CATEGORIES.map(({ value, label, icon }) => {
+                          const disabled = pref.disabled_categories?.includes(value) ?? false;
+                          const checked = !disabled;
+                          return (
+                            <label
+                              key={value}
+                              style={{
+                                display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+                                background: checked ? "#f8fafc" : "#fafafa",
+                                border: `1px solid ${checked ? "#e2e8f0" : "#e2e8f0"}`,
+                                borderRadius: 7, padding: "8px 12px", fontSize: 13,
+                                color: checked ? "#374151" : "#94a3b8", userSelect: "none",
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                style={{ width: 14, height: 14 }}
+                                onChange={() => {
+                                  const current = pref.disabled_categories ?? [];
+                                  const next = checked
+                                    ? [...current, value]
+                                    : current.filter((c) => c !== value);
+                                  savePref(child.id, { ...pref, disabled_categories: next });
+                                }}
+                              />
+                              <span style={{ fontSize: 15 }}>{icon}</span>
+                              <span style={{ fontWeight: 500 }}>{label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Digest frequency */}
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
+                        Weekly digest
+                      </p>
+                      <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+                        <span style={{ color: "#64748b" }}>Send me a digest email</span>
+                        <select
+                          value={pref.digest_frequency}
+                          onChange={(e) => savePref(child.id, { ...pref, digest_frequency: e.target.value as "daily" | "weekly" })}
+                          style={{ fontSize: 13 }}
+                        >
+                          <option value="daily">Daily</option>
+                          <option value="weekly">Weekly</option>
+                        </select>
+                      </label>
+                    </div>
                   </div>
                 )}
               </div>
