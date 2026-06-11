@@ -53,6 +53,14 @@ export default function Dashboard() {
   const [recentAlerts, setRecentAlerts] = useState<Alert[]>([]);
   const [unreviewedCount, setUnreviewedCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [nudgeDismissed, setNudgeDismissed] = useState(
+    () => localStorage.getItem("sm_nudge_dismissed") === "1"
+  );
+
+  const dismissNudge = () => {
+    localStorage.setItem("sm_nudge_dismissed", "1");
+    setNudgeDismissed(true);
+  };
 
   useEffect(() => {
     Promise.all([
@@ -114,7 +122,7 @@ export default function Dashboard() {
       )}
 
       {/* Finish-setup nudge for users who skipped onboarding without connecting */}
-      {activeConns === 0 && (
+      {activeConns === 0 && !nudgeDismissed && (
         <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 18 }}>🛡️</span>
           <span style={{ fontSize: 14, color: "#1e40af", flex: 1 }}>
@@ -123,6 +131,14 @@ export default function Dashboard() {
           <Link to="/onboarding" style={{ background: "#2563eb", color: "#fff", padding: "5px 14px", borderRadius: 6, fontSize: 13, fontWeight: 500, textDecoration: "none" }}>
             Finish setup
           </Link>
+          <button
+            onClick={dismissNudge}
+            aria-label="Dismiss"
+            title="Dismiss"
+            style={{ background: "none", border: "none", color: "#60a5fa", fontSize: 20, lineHeight: 1, cursor: "pointer", padding: "0 4px" }}
+          >
+            ×
+          </button>
         </div>
       )}
 
