@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     max_body_length: int = 8000
     alert_poll_interval_minutes: int = 5
 
+    # Model cascade (Haiku triage → Sonnet escalation). OFF by default: it cuts
+    # cost but the live eval showed Haiku over-confidently clears subtle
+    # personal_info_sharing disclosures, regressing that category's recall. Keep
+    # off until the escalation rule is tuned and re-validated against the eval.
+    cascade_enabled: bool = False
+
     # Auth rate limiting (slowapi, Redis-backed). Disabled in the test suite.
     rate_limit_enabled: bool = True
 

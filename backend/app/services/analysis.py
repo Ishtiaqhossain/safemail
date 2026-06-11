@@ -179,36 +179,16 @@ def _classify_once(model: str, user_content: str) -> dict:
     return result
 
 
-def classify_email(message: dict) -> dict:
-    """Classify an email via the triage → escalation cascade.
-
-    Returns the normalized classification plus aggregate usage across every call
-    the cascade made: input_tokens, output_tokens, cost_usd (per-model accurate),
-    model (e.g. "claude-haiku-4-5" or "claude-haiku-4-5+claude-sonnet-4-6"), and
-    escalated (bool).
-    """
-    user_content = _build_user_content(message)
-
-    triage = _classify_once(TRIAGE_MODEL, user_content)
-    calls = [triage]
-
-    # Trust triage only when it is confidently benign; otherwise the strong model
-    # decides. This bounds recall loss to "triage confidently mis-clears a real
-    # threat", which tests/evaluation measures and ESCALATION_CONFIDENCE tunes.
-    confidently_benign = (
-        triage["severity"] == "none" and triage["confidence"] >= ESCALATION_CONFIDENCE
-    )
-    final = triage if confidently_benign else _classify_once(ESCALATION_MODEL, user_content)
-    if final is not triage:
-        calls.append(final)
-
+def _aggregate(calls: list[dict]) -> dict:
+    """Build the public result from one or more cascade calls. The last call is
+    authoritative; usage and cost are summed across all of them (per-model)."""
+    final = calls[-1]
     input_tokens = sum(c["_input_tokens"] for c in calls)
     output_tokens = sum(c["_output_tokens"] for c in calls)
     cost_usd = round(
         sum(token_cost_usd(c["_input_tokens"], c["_output_tokens"], c["_model"]) for c in calls),
         6,
     )
-
     return {
         "severity": final["severity"],
         "category": final["category"],
@@ -221,3 +201,34 @@ def classify_email(message: dict) -> dict:
         "model": "+".join(c["_model"] for c in calls),
         "escalated": len(calls) > 1,
     }
+
+
+def classify_email(message: dict) -> dict:
+    """Classify an email.
+
+    Default (CASCADE_ENABLED=false): a single pass on the strong model — highest
+    recall. When the cascade is enabled, a cheap model triages first and only
+    escalates emails it doesn't confidently clear as benign. The result shape is
+    identical either way: the normalized classification plus aggregate usage
+    (input_tokens, output_tokens, cost_usd), model, and escalated.
+    """
+    user_content = _build_user_content(message)
+
+    if not settings.cascade_enabled:
+        return _aggregate([_classify_once(ESCALATION_MODEL, user_content)])
+
+    triage = _classify_once(TRIAGE_MODEL, user_content)
+    calls = [triage]
+
+    # Trust triage only when it is confidently benign; otherwise the strong model
+    # decides. This bounds recall loss to "triage confidently mis-clears a real
+    # threat", which tests/evaluation measures and ESCALATION_CONFIDENCE tunes.
+    # NOTE: the live eval found Haiku over-confidently clears personal_info_sharing
+    # disclosures here — tune this rule and re-validate before enabling in prod.
+    confidently_benign = (
+        triage["severity"] == "none" and triage["confidence"] >= ESCALATION_CONFIDENCE
+    )
+    if not confidently_benign:
+        calls.append(_classify_once(ESCALATION_MODEL, user_content))
+
+    return _aggregate(calls)
