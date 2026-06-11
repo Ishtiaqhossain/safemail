@@ -2,7 +2,9 @@
 # envsubst over this file at startup, substituting ${API_UPSTREAM} (an env var)
 # while leaving nginx's own $-variables untouched (they aren't in the env).
 server {
-    listen       80;
+    # ${PORT} is substituted at startup. Defaults to 80 (set in the Dockerfile)
+    # for the compose stack; Railway injects its own $PORT and routes to it.
+    listen       ${PORT};
     server_name  _;
 
     root   /usr/share/nginx/html;

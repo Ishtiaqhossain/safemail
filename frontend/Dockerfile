@@ -14,10 +14,11 @@ RUN npm run build
 
 # --- serve stage ---
 FROM nginx:1.27-alpine
-# API_UPSTREAM is substituted into the nginx config at container start by the
-# base image's envsubst step. Defaults to the compose service name; override on
-# a PaaS to point at the API service's internal address.
+# API_UPSTREAM and PORT are substituted into the nginx config at container start
+# by the base image's envsubst step. Defaults suit the compose stack; a PaaS
+# overrides PORT (the port it routes to) and API_UPSTREAM (the API's address).
 ENV API_UPSTREAM=api:8000
+ENV PORT=80
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
