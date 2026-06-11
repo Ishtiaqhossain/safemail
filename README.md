@@ -78,23 +78,41 @@ Or start everything at once:
 docker compose up
 ```
 
+## Deployment
+
+The whole stack is packaged as portable Docker images configured purely through environment variables, so it runs on any Docker host or managed PaaS.
+
+```bash
+# Full production stack on any Docker host (VPS, etc.)
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+```
+
+This brings up six services — Postgres, Redis, the API, a Celery worker, Celery beat, and the frontend (nginx serving the SPA and reverse-proxying `/v1` to the API, same-origin). The API container applies migrations on start (`RUN_MIGRATIONS=true`).
+
+- **Managed PaaS (Railway):** step-by-step guide in [`docs/DEPLOY-railway.md`](docs/DEPLOY-railway.md). Thin per-service manifests live in `backend/railway.json` and `frontend/railway.json`.
+- **Config contract:** every required production variable is listed in `.env.production.example`.
+- Production hardening (all on by default when `DEBUG=false`): rate limiting on auth endpoints, refresh-token revocation, security headers, password-strength rules, generic 500s with server-side logging, and fail-fast validation of required secrets.
+
 ## Environment Variables
 
 | Variable | Description |
 |---|---|
-| `DATABASE_URL` | PostgreSQL connection (asyncpg format) |
+| `DATABASE_URL` | PostgreSQL connection. Any scheme (`postgres://`, `postgresql://`, `postgresql+asyncpg://`) is auto-normalized to asyncpg. |
 | `REDIS_URL` | Redis connection |
 | `FERNET_KEY` | AES encryption key for OAuth tokens |
-| `JWT_PRIVATE_KEY_PATH` | Path to RSA private key |
-| `JWT_PUBLIC_KEY_PATH` | Path to RSA public key |
+| `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` | RSA key **contents** (PEM, `\n`-escaped OK). Used in production instead of files — no secret-file mount needed. |
+| `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | Paths to the RSA keypair (local-dev fallback when the above aren't set) |
 | `GOOGLE_CLIENT_ID` | Google OAuth app client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth app client secret |
 | `GOOGLE_REDIRECT_URI` | Must match Google Console exactly |
 | `ANTHROPIC_API_KEY` | Claude API key for email classification |
 | `SENDGRID_API_KEY` | For alert and digest emails |
+| `EMAIL_FROM` | From-address for transactional email — must be a verified SendGrid sender |
 | `FCM_SERVICE_ACCOUNT_JSON` | Firebase push notifications (optional) |
+| `DEBUG` | `true` locally (enables `/docs`, relaxes secret validation). **Must be `false` in production.** |
+| `COOKIE_SECURE` | `true` in production so the refresh cookie is HTTPS-only |
 
-See `.env.example` for the full template.
+See `.env.example` (local) and `.env.production.example` (production contract) for full templates.
 
 ## Running Tests
 

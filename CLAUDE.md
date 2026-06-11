@@ -37,7 +37,11 @@ safemail/
 │       ├── components/       AlertBadge, NavBar
 │       ├── pages/            Login, Dashboard, AlertFeed, AlertDetail, Settings
 │       └── types/            Shared TypeScript types
-├── docker-compose.yml        Postgres + Redis + API + worker + beat
+├── docker-compose.yml        Local dev: Postgres + Redis + API + worker + beat
+├── docker-compose.prod.yml   Production stack (adds frontend; no bind mounts/reload)
+├── .env.production.example   Production env contract
+├── docs/
+│   └── DEPLOY-railway.md      Step-by-step Railway deploy guide
 ├── PRD_email_monitoring.md   Product requirements
 └── TECH_SPEC_email_monitoring.md  Technical specification
 ```
@@ -114,17 +118,21 @@ Quality gates: ≥ 85% recall, ≤ 15% false positive rate.
 
 | Variable | Description |
 |---|---|
-| `DATABASE_URL` | PostgreSQL connection (asyncpg format) |
+| `DATABASE_URL` | PostgreSQL connection. Any scheme is auto-normalized to `postgresql+asyncpg://` in `config.py`. |
 | `REDIS_URL` | Redis connection |
 | `FERNET_KEY` | AES encryption key for OAuth tokens |
-| `JWT_PRIVATE_KEY_PATH` | Path to RSA private key |
-| `JWT_PUBLIC_KEY_PATH` | Path to RSA public key |
+| `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` | RSA key **contents** (PEM, `\n`-escaped accepted). Preferred in prod; falls back to the `*_PATH` files when unset. |
+| `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | Paths to the RSA keypair (local-dev default) |
 | `GOOGLE_CLIENT_ID` | Google OAuth app client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth app client secret |
 | `GOOGLE_REDIRECT_URI` | Must match Google Console exactly |
 | `ANTHROPIC_API_KEY` | Claude API key for email classification |
 | `SENDGRID_API_KEY` | For alert and digest emails |
+| `EMAIL_FROM` | From-address for all transactional email — must be a verified SendGrid sender |
 | `FCM_SERVICE_ACCOUNT_JSON` | Firebase push notifications (optional) |
+| `DEBUG` | `true` locally (enables `/docs`, relaxes validation); **`false` in production** |
+| `COOKIE_SECURE` | `true` in production (HTTPS-only refresh cookie) |
+| `RUN_MIGRATIONS` | Set `true` on the API container only — its entrypoint runs `alembic upgrade head` |
 
 ## Architecture decisions
 
@@ -133,7 +141,17 @@ Quality gates: ≥ 85% recall, ≤ 15% false positive rate.
 - **Confidence threshold is 0.70.** Emails classified below this are silently dropped. Tune via `CONFIDENCE_THRESHOLD` in config.
 - **Gmail polling is every 5 minutes.** Redis dedup set (7-day TTL) prevents the same message being analyzed twice.
 - **OAuth tokens are Fernet-encrypted** before writing to the DB. Never log or return them in API responses.
-- **JWT uses RS256** (asymmetric). Private key signs, public key verifies. Both stored in `backend/keys/`.
+- **JWT uses RS256** (asymmetric). Private key signs, public key verifies. Locally from `backend/keys/`; in production from the `JWT_PRIVATE_KEY`/`JWT_PUBLIC_KEY` env vars (no secret-file mount required).
+- **Production hardening (active when `DEBUG=false`).** Rate limiting on auth endpoints (`app/ratelimit.py`), refresh-token revocation via a Redis denylist (`app/services/token_denylist.py`), security-headers middleware + tight CORS, password-strength validation, generic 500 bodies (full traceback logged server-side), `/docs` disabled, and startup validation that required secrets are set.
+
+## Deployment
+
+Portable Docker stack configured entirely via env vars — runs on any Docker host or PaaS.
+
+- **Canonical artifact:** `docker-compose.prod.yml` (six services: postgres, redis, api, worker, beat, frontend). The frontend is an nginx container that serves the SPA and reverse-proxies `/v1` to the API (same-origin → refresh cookie works, no CORS). nginx re-resolves the API upstream per request (`resolver` + variable `proxy_pass`) so it survives backend redeploys.
+- **Backend image** (`backend/Dockerfile`): non-root, `entrypoint.sh` runs migrations when `RUN_MIGRATIONS=true`, uvicorn binds `--host ::` (IPv6 dual-stack, required for Railway private networking).
+- **Railway (current deploy):** see `docs/DEPLOY-railway.md`; per-service manifests in `backend/railway.json` + `frontend/railway.json`. Each service needs its Root Directory set (`backend` or `frontend`).
+- **Env contract:** `.env.production.example`.
 
 ## API base URL
 
