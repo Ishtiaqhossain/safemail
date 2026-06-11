@@ -16,9 +16,21 @@ server {
     # whenever the backend redeploys to a new address.
     resolver ${NGINX_LOCAL_RESOLVERS} valid=10s;
 
+    # Content-hashed build assets (e.g. /assets/index-AbC123.js). The filename
+    # changes whenever the content does, so these are safe to cache forever.
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+
     # SPA: fall back to index.html so client-side routes resolve.
+    #
+    # index.html must NOT be cached: it references the current hashed bundle, so
+    # a stale copy pins the browser to an old deploy. no-cache lets the browser
+    # keep a copy but forces revalidation every load (cheap — 304 via ETag when
+    # unchanged), so a new deploy is picked up immediately.
     location / {
         try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-cache" always;
     }
 
     # Same-origin API proxy. Keeps the frontend and API on one origin so the
