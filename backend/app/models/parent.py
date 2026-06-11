@@ -18,6 +18,8 @@ class Parent(Base):
     is_email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_developer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    onboarding_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    monitoring_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

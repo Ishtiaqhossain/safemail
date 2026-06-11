@@ -87,6 +87,8 @@ async def register(request: Request, body: RegisterRequest, response: Response, 
         "is_admin": parent.is_admin,
         "is_developer": parent.is_developer,
         "is_email_verified": parent.is_email_verified,
+        "onboarding_completed": parent.onboarding_completed_at is not None,
+        "monitoring_consent": parent.monitoring_consent_at is not None,
     }
 
 
@@ -112,6 +114,8 @@ async def login(request: Request, body: LoginRequest, response: Response, db: An
         "is_admin": parent.is_admin,
         "is_developer": parent.is_developer,
         "is_email_verified": parent.is_email_verified,
+        "onboarding_completed": parent.onboarding_completed_at is not None,
+        "monitoring_consent": parent.monitoring_consent_at is not None,
     }
 
 
@@ -138,6 +142,8 @@ async def refresh(request: Request, db: Annotated[AsyncSession, Depends(get_db)]
         "is_admin": parent.is_admin,
         "is_developer": parent.is_developer,
         "is_email_verified": parent.is_email_verified,
+        "onboarding_completed": parent.onboarding_completed_at is not None,
+        "monitoring_consent": parent.monitoring_consent_at is not None,
     }
 
 
@@ -232,6 +238,7 @@ async def google_connect(
     child_id: str,
     current_parent: Annotated[Parent, Depends(get_current_parent)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    return_to: str | None = None,
 ):
     result = await db.execute(
         select(Child).where(Child.id == uuid.UUID(child_id), Child.parent_id == current_parent.id)
@@ -240,9 +247,16 @@ async def google_connect(
         raise HTTPException(status_code=404, detail="Child not found")
 
     flow = Flow.from_client_config(_GOOGLE_CLIENT_CONFIG(), scopes=GMAIL_SCOPES, redirect_uri=settings.google_redirect_uri)
-    state = create_oauth_state_token(current_parent.id, uuid.UUID(child_id))
+    state = create_oauth_state_token(current_parent.id, uuid.UUID(child_id), return_to=return_to)
     auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent", state=state)
     return {"auth_url": auth_url}
+
+
+def _safe_return_path(return_to: str | None) -> str:
+    """Only allow same-app relative paths to avoid open-redirects."""
+    if return_to and return_to.startswith("/") and not return_to.startswith("//"):
+        return return_to
+    return "/dashboard?connected=true"
 
 
 @router.get("/google/callback")
@@ -253,6 +267,7 @@ async def google_callback(code: str, state: str, db: Annotated[AsyncSession, Dep
             raise ValueError
         parent_id = uuid.UUID(payload["parent_id"])
         child_id = uuid.UUID(payload["child_id"])
+        return_to = payload.get("return_to")
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid state parameter")
 
@@ -285,7 +300,7 @@ async def google_callback(code: str, state: str, db: Annotated[AsyncSession, Dep
     db.add(conn)
     await db.commit()
 
-    return RedirectResponse(f"{settings.frontend_url}/dashboard?connected=true")
+    return RedirectResponse(f"{settings.frontend_url}{_safe_return_path(return_to)}")
 
 
 @router.delete("/google/{connection_id}", status_code=204)

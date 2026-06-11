@@ -6,24 +6,32 @@ import Dashboard from "@/pages/Dashboard";
 import AlertFeed from "@/pages/AlertFeed";
 import AlertDetail from "@/pages/AlertDetail";
 import Settings from "@/pages/Settings";
-import { isAuthenticated, tryRefresh, getIsAdmin, getIsDeveloper } from "@/api/client";
+import { isAuthenticated, tryRefresh, getIsAdmin, getIsDeveloper, getOnboardingCompleted } from "@/api/client";
 import Admin from "@/pages/Admin";
 import Developer from "@/pages/Developer";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import VerifyEmail from "@/pages/VerifyEmail";
+import Onboarding from "@/pages/Onboarding";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
 function ProtectedRoute({ authStatus, children }: { authStatus: AuthStatus; children: React.ReactNode }) {
   if (authStatus === "loading") return <p style={{ padding: 24 }}>Loading...</p>;
   if (authStatus === "unauthenticated") return <Navigate to="/login" replace />;
+  if (!getOnboardingCompleted()) return <Navigate to="/onboarding" replace />;
   return (
     <>
       <NavBar />
       <main>{children}</main>
     </>
   );
+}
+
+function OnboardingRoute({ authStatus, children }: { authStatus: AuthStatus; children: React.ReactNode }) {
+  if (authStatus === "loading") return <p style={{ padding: 24 }}>Loading...</p>;
+  if (authStatus === "unauthenticated") return <Navigate to="/login" replace />;
+  return <main>{children}</main>;
 }
 
 function AdminRoute({ authStatus, children }: { authStatus: AuthStatus; children: React.ReactNode }) {
@@ -70,6 +78,7 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/onboarding" element={<OnboardingRoute authStatus={authStatus}><Onboarding /></OnboardingRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute authStatus={authStatus}><Dashboard /></ProtectedRoute>} />
         <Route path="/alerts" element={<ProtectedRoute authStatus={authStatus}><AlertFeed /></ProtectedRoute>} />
         <Route path="/alerts/:id" element={<ProtectedRoute authStatus={authStatus}><AlertDetail /></ProtectedRoute>} />

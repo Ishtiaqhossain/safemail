@@ -15,9 +15,11 @@ export const childrenApi = {
   getStats: (childId: string, week?: string) =>
     api.get<WeeklyStats>(`/children/${childId}/stats`, { params: { week } }).then((r) => r.data),
 
-  connectGmail: (childId: string) =>
-    api.get<{ auth_url: string }>(`/auth/google/connect?child_id=${childId}`)
-      .then((r) => { window.location.href = r.data.auth_url; }),
+  connectGmail: (childId: string, returnTo?: string) => {
+    const qs = returnTo ? `&return_to=${encodeURIComponent(returnTo)}` : "";
+    return api.get<{ auth_url: string }>(`/auth/google/connect?child_id=${childId}${qs}`)
+      .then((r) => { window.location.href = r.data.auth_url; });
+  },
 
   disconnectGmail: (connectionId: string) => api.delete(`/auth/google/${connectionId}`),
 };
