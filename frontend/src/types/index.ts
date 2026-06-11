@@ -114,6 +114,28 @@ export interface LlmStats {
   all_time: LlmUsagePeriod;
 }
 
+export interface FeedbackCategoryInsight {
+  category: string;
+  labeled: number;
+  correct: number;
+  false_positive: number;
+  fp_rate: number | null;
+  avg_fp_confidence: number | null;
+  avg_correct_confidence: number | null;
+}
+
+export interface FeedbackInsights {
+  confidence_threshold: number;
+  overall: {
+    labeled: number;
+    correct: number;
+    false_positive: number;
+    precision: number | null;
+    false_positives_above_threshold: number;
+  };
+  by_category: FeedbackCategoryInsight[];
+}
+
 export interface WeeklyStats {
   week_start: string;
   total_emails: number;

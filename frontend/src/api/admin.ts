@@ -1,5 +1,5 @@
 import api from "./client";
-import type { AdminOverview, AdminEvent, TaskLogEntry, LlmStats, AllowedEmail, WaitlistEntry } from "@/types";
+import type { AdminOverview, AdminEvent, TaskLogEntry, LlmStats, AllowedEmail, WaitlistEntry, FeedbackInsights } from "@/types";
 
 interface PagedResponse<T> {
   data: T[];
@@ -16,6 +16,8 @@ export const adminApi = {
     api.get<PagedResponse<TaskLogEntry>>("/admin/tasks", { params: { page, per_page: 50, status } }).then((r) => r.data),
 
   getLlmStats: () => api.get<LlmStats>("/admin/llm-stats").then((r) => r.data),
+
+  getFeedbackInsights: () => api.get<FeedbackInsights>("/admin/feedback-insights").then((r) => r.data),
 
   getAllowlist: () =>
     api.get<{ data: AllowedEmail[] }>("/admin/allowlist").then((r) => r.data.data),

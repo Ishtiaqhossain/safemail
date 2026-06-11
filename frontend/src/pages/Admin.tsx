@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { adminApi } from "@/api/admin";
-import type { AdminOverview, AdminEvent, TaskLogEntry, LlmStats, AllowedEmail, WaitlistEntry } from "@/types";
+import type { AdminOverview, AdminEvent, TaskLogEntry, LlmStats, AllowedEmail, WaitlistEntry, FeedbackInsights } from "@/types";
 
-type Tab = "overview" | "llm" | "allowlist" | "waitlist" | "events" | "tasks";
+type Tab = "overview" | "llm" | "feedback" | "allowlist" | "waitlist" | "events" | "tasks";
 
 const fmtNum = (n: number) => n.toLocaleString();
 const fmtCost = (n: number) => (n === 0 ? "$0.00" : n < 0.01 ? "< $0.01" : `$${n.toFixed(n >= 1 ? 2 : 4)}`);
@@ -461,6 +461,75 @@ function AllowlistTab() {
   );
 }
 
+// ── Feedback Insights Tab ─────────────────────────────────────────────────────
+
+function FeedbackTab() {
+  const [data, setData] = useState<FeedbackInsights | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    adminApi.getFeedbackInsights().then(setData).catch(() => setError("Failed to load feedback insights"));
+  }, []);
+
+  if (error) return <Card><p style={{ color: "#dc2626", margin: 0 }}>{error}</p></Card>;
+  if (!data) return <Card><div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Loading…</div></Card>;
+
+  const pct = (v: number | null) => (v === null ? "—" : `${(v * 100).toFixed(0)}%`);
+  const conf = (v: number | null) => (v === null ? "—" : v.toFixed(2));
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <p style={{ fontSize: 13, color: "#64748b", margin: 0 }}>
+        Real-world classifier calibration from parent feedback. Use the per-category false-positive
+        rate and the confidence gap (avg confidence on false positives vs. correct alerts) to tune the
+        confidence threshold — globally or per category.
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+        <StatCard label="Labeled alerts" value={data.overall.labeled} />
+        <StatCard label="Precision" value={pct(data.overall.precision)} />
+        <StatCard label="False positives" value={data.overall.false_positive} warn={data.overall.false_positive > 0} />
+        <StatCard label={`FPs ≥ threshold (${data.confidence_threshold})`} value={data.overall.false_positives_above_threshold} warn={data.overall.false_positives_above_threshold > 0} />
+      </div>
+
+      <Card>
+        {data.by_category.length === 0 ? (
+          <div style={{ padding: 32, textAlign: "center", color: "#94a3b8" }}>
+            No parent feedback yet — insights appear once parents mark alerts correct or false-positive.
+          </div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Labeled</th>
+                <th>Correct</th>
+                <th>False pos.</th>
+                <th>FP rate</th>
+                <th>Avg conf. (FP)</th>
+                <th>Avg conf. (correct)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.by_category.map((c) => (
+                <tr key={c.category}>
+                  <td style={{ fontWeight: 500 }}>{c.category}</td>
+                  <td>{c.labeled}</td>
+                  <td>{c.correct}</td>
+                  <td style={{ color: c.false_positive > 0 ? "#dc2626" : undefined }}>{c.false_positive}</td>
+                  <td>{pct(c.fp_rate)}</td>
+                  <td>{conf(c.avg_fp_confidence)}</td>
+                  <td>{conf(c.avg_correct_confidence)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // ── Waitlist Tab ──────────────────────────────────────────────────────────────
 
 function WaitlistTab() {
@@ -547,7 +616,7 @@ export default function Admin() {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #e2e8f0", marginBottom: 24 }}>
-        {(["overview", "llm", "allowlist", "waitlist", "events", "tasks"] as Tab[]).map((t) => (
+        {(["overview", "llm", "feedback", "allowlist", "waitlist", "events", "tasks"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -568,6 +637,7 @@ export default function Admin() {
 
       {tab === "overview"  && <OverviewTab />}
       {tab === "llm"       && <LlmTab />}
+      {tab === "feedback"  && <FeedbackTab />}
       {tab === "allowlist" && <AllowlistTab />}
       {tab === "waitlist"  && <WaitlistTab />}
       {tab === "events"    && <EventsTab />}

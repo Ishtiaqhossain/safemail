@@ -191,7 +191,7 @@ async def classify(
     _: Annotated[Parent, Depends(get_current_developer)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    from app.services.analysis import classify_email, token_cost_usd
+    from app.services.analysis import classify_email
     from app.models.task_log import TaskLog
 
     started = datetime.now(timezone.utc)
@@ -205,6 +205,9 @@ async def classify(
 
     input_tokens = result.pop("input_tokens", 0)
     output_tokens = result.pop("output_tokens", 0)
+    cost_usd = result.pop("cost_usd", 0.0)
+    model_used = result.pop("model", None)
+    escalated = result.pop("escalated", None)
     duration_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
 
     # Log the playground call so its token usage counts toward admin LLM stats.
@@ -215,6 +218,9 @@ async def classify(
         meta={
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
+            "cost_usd": cost_usd,
+            "model": model_used,
+            "escalated": escalated,
             "severity": result.get("severity", "none"),
             "playground": True,
         },
@@ -226,7 +232,9 @@ async def classify(
         "usage": {
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
-            "cost_usd": token_cost_usd(input_tokens, output_tokens),
+            "cost_usd": cost_usd,
+            "model": model_used,
+            "escalated": escalated,
         },
     }
 

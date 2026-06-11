@@ -5,8 +5,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, cast, Integer
+from sqlalchemy import select, func, and_, cast, Integer, Float
 
+from app.config import get_settings
 from app.database import get_db
 from app.auth import get_current_admin
 from app.models.parent import Parent
@@ -17,11 +18,12 @@ from app.models.task_log import TaskLog
 from app.models.allowed_email import AllowedEmail
 from app.models.waitlist_entry import WaitlistEntry
 from app.services.analysis import (
-    MODEL_NAME, INPUT_TOKEN_PRICE_PER_M, OUTPUT_TOKEN_PRICE_PER_M, token_cost_usd,
+    CASCADE_MODELS, INPUT_TOKEN_PRICE_PER_M, OUTPUT_TOKEN_PRICE_PER_M,
 )
 from app.services.allowlist import normalize_email
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+settings = get_settings()
 
 # Tasks whose task_log.meta carries Claude token usage.
 LLM_TASK_NAMES = ["analyze_message", "playground_classify"]
@@ -32,6 +34,14 @@ async def _llm_usage(db: AsyncSession, since: datetime | None = None) -> dict:
     # tracking existed don't show up as zero-cost calls.
     input_tok_col = cast(TaskLog.meta["input_tokens"].astext, Integer)
     output_tok_col = cast(TaskLog.meta["output_tokens"].astext, Integer)
+    # Prefer the per-call cost stored on each row (cascade-aware — a Haiku-only
+    # triage is priced at Haiku rates). Fall back to an escalation-model-rate
+    # estimate for rows logged before cost tracking existed.
+    cost_col = cast(TaskLog.meta["cost_usd"].astext, Float)
+    est_cost = (
+        input_tok_col / 1_000_000.0 * INPUT_TOKEN_PRICE_PER_M
+        + output_tok_col / 1_000_000.0 * OUTPUT_TOKEN_PRICE_PER_M
+    )
     filters = [
         TaskLog.task_name.in_(LLM_TASK_NAMES),
         TaskLog.status == "success",
@@ -45,6 +55,7 @@ async def _llm_usage(db: AsyncSession, since: datetime | None = None) -> dict:
             func.count().label("calls"),
             func.coalesce(func.sum(input_tok_col), 0).label("input_tokens"),
             func.coalesce(func.sum(output_tok_col), 0).label("output_tokens"),
+            func.coalesce(func.sum(func.coalesce(cost_col, est_cost)), 0.0).label("cost_usd"),
         ).where(and_(*filters))
     )).one()
 
@@ -52,7 +63,7 @@ async def _llm_usage(db: AsyncSession, since: datetime | None = None) -> dict:
         "calls": row.calls,
         "input_tokens": row.input_tokens,
         "output_tokens": row.output_tokens,
-        "cost_usd": token_cost_usd(row.input_tokens, row.output_tokens),
+        "cost_usd": round(row.cost_usd or 0.0, 4),
     }
 
 
@@ -63,7 +74,7 @@ async def llm_stats(
 ):
     now = datetime.now(timezone.utc)
     return {
-        "model": MODEL_NAME,
+        "model": "+".join(CASCADE_MODELS),
         "pricing": {
             "input_per_million": INPUT_TOKEN_PRICE_PER_M,
             "output_per_million": OUTPUT_TOKEN_PRICE_PER_M,
@@ -385,3 +396,75 @@ async def remove_waitlist(
         raise HTTPException(status_code=404, detail="Waitlist entry not found.")
     await db.delete(entry)
     await db.commit()
+
+
+# ── Feedback insights (parent feedback → classifier calibration) ───────────────
+
+@router.get("/feedback-insights")
+async def feedback_insights(
+    _: Annotated[Parent, Depends(get_current_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Turn parent feedback into a calibration signal for the classifier.
+
+    Raw email bodies are never stored, so feedback (correct | false_positive) is
+    the highest-quality real-world signal we have. Per category we report the
+    confirmed false-positive rate and the confidence distribution of FPs vs true
+    positives — directly actionable for tuning CONFIDENCE_THRESHOLD (globally or
+    per category) and for spotting which categories over-fire.
+    """
+    rows = (await db.execute(
+        select(Alert.category, Alert.confidence, Alert.parent_feedback)
+        .where(
+            Alert.parent_feedback.isnot(None),
+            ~Alert.gmail_message_id.like("fake_%"),
+        )
+    )).all()
+
+    threshold = settings.confidence_threshold
+    by_cat: dict[str, dict] = {}
+    total_fp = total_correct = fp_above_threshold = 0
+
+    for cat, confidence, feedback in rows:
+        conf = float(confidence)
+        b = by_cat.setdefault(cat, {"correct": 0, "false_positive": 0,
+                                    "fp_conf_sum": 0.0, "tp_conf_sum": 0.0})
+        if feedback == "false_positive":
+            b["false_positive"] += 1
+            b["fp_conf_sum"] += conf
+            total_fp += 1
+            if conf >= threshold:
+                fp_above_threshold += 1
+        elif feedback == "correct":
+            b["correct"] += 1
+            b["tp_conf_sum"] += conf
+            total_correct += 1
+
+    categories = []
+    for cat, b in sorted(by_cat.items()):
+        labeled = b["correct"] + b["false_positive"]
+        fp, tp = b["false_positive"], b["correct"]
+        categories.append({
+            "category": cat,
+            "labeled": labeled,
+            "correct": tp,
+            "false_positive": fp,
+            "fp_rate": round(fp / labeled, 3) if labeled else None,
+            "avg_fp_confidence": round(b["fp_conf_sum"] / fp, 3) if fp else None,
+            "avg_correct_confidence": round(b["tp_conf_sum"] / tp, 3) if tp else None,
+        })
+
+    total_labeled = total_fp + total_correct
+    return {
+        "confidence_threshold": threshold,
+        "overall": {
+            "labeled": total_labeled,
+            "correct": total_correct,
+            "false_positive": total_fp,
+            "precision": round(total_correct / total_labeled, 3) if total_labeled else None,
+            # FPs that cleared the threshold — these are the alerts a higher bar
+            # would have suppressed, the main lever for cutting false positives.
+            "false_positives_above_threshold": fp_above_threshold,
+        },
+        "by_category": categories,
+    }
