@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
     cookie_secure: bool = False
 
+    # From-address for all transactional email. Must be a verified SendGrid sender
+    # (single sender, or any address on an authenticated domain). Override per env.
+    email_from: str = "noreply@safemail.com"
+
     # Production hardening. When False (the production default): Swagger/redoc are
     # disabled, 500s return a generic body instead of the exception text, and
     # startup fails fast if required secrets are missing. Set DEBUG=true locally.

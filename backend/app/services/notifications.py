@@ -34,7 +34,7 @@ def send_alert_email(parent_email: str, child_name: str, alert: dict) -> None:
 """
 
     message = Mail(
-        from_email="alerts@safemail.com",
+        from_email=settings.email_from,
         to_emails=parent_email,
         subject=f"[SafeMail] {severity} Alert — {child_name}'s Email",
         html_content=html,
@@ -60,7 +60,7 @@ def send_verification_email(to_email: str, verify_url: str) -> None:
 </div>"""
 
     message = Mail(
-        from_email="noreply@safemail.com",
+        from_email=settings.email_from,
         to_emails=to_email,
         subject="Verify your SafeMail email address",
         html_content=html,
@@ -86,7 +86,7 @@ def send_password_reset_email(to_email: str, reset_url: str) -> None:
 </div>"""
 
     message = Mail(
-        from_email="noreply@safemail.com",
+        from_email=settings.email_from,
         to_emails=to_email,
         subject="Reset your SafeMail password",
         html_content=html,
@@ -115,7 +115,7 @@ def send_reconnect_email(to_email: str, child_name: str, gmail_address: str, rec
 </div>"""
 
     message = Mail(
-        from_email="noreply@safemail.com",
+        from_email=settings.email_from,
         to_emails=to_email,
         subject=f"[SafeMail] Reconnect needed — {child_name}'s email is no longer monitored",
         html_content=html,
