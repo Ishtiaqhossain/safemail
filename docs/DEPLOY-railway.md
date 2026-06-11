@@ -74,6 +74,13 @@ JWT_PUBLIC_KEY=<escaped PEM from step 0>
 Each uses **Root Directory = `backend`** (so it builds `backend/Dockerfile` via
 `backend/railway.json`).
 
+> **Set the Root Directory or the build fails.** Without it Railway builds the
+> repo root with its autodetect builder (Railpack) and errors with
+> *"could not determine how to build the app"* — it never sees the per-service
+> `railway.json`/`Dockerfile`. Setting the root directory fixes it. If Railway
+> still ignores the Dockerfile, force it under **Settings -> Build -> Builder ->
+> Dockerfile**.
+
 **api** (the service auto-created in Step 1):
 - Settings -> **Source** -> Root Directory: `backend`
 - Settings -> **Variables** (in addition to the shared ones):
