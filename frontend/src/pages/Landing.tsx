@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { joinWaitlist } from "@/api/waitlist";
 import "./landing.css";
 
 /* ------------------------------------------------------------------ */
@@ -79,29 +80,60 @@ const FAQS = [
 /* ------------------------------------------------------------------ */
 
 function EmailCaptureCTA({ buttonLabel = "Request an invite" }: { buttonLabel?: string }) {
-  const navigate = useNavigate();
   const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "submitting" | "done" | "error">("idle");
 
-  const go = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = email.trim();
-    const qs = trimmed
-      ? `?mode=register&email=${encodeURIComponent(trimmed)}`
-      : "?mode=register";
-    navigate(`/login${qs}`);
+    if (!trimmed) return;
+    setStatus("submitting");
+    try {
+      await joinWaitlist(trimmed);
+      setStatus("done");
+    } catch {
+      setStatus("error");
+    }
   };
 
+  if (status === "done") {
+    return (
+      <div
+        role="status"
+        style={{
+          display: "flex", alignItems: "center", gap: 10, maxWidth: 440,
+          background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534",
+          borderRadius: 10, padding: "13px 16px", fontSize: 15, fontWeight: 500,
+        }}
+      >
+        <span style={{ fontSize: 18 }}>✓</span>
+        You're on the list — we'll email you an invite as a spot opens up.
+      </div>
+    );
+  }
+
   return (
-    <form className="lp-capture" onSubmit={go}>
-      <input
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="you@example.com"
-        aria-label="Email address"
-      />
-      <button type="submit" className="lp-btn-primary">{buttonLabel}</button>
-    </form>
+    <div style={{ maxWidth: 440 }}>
+      <form className="lp-capture" onSubmit={submit}>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          aria-label="Email address"
+          required
+          disabled={status === "submitting"}
+        />
+        <button type="submit" className="lp-btn-primary" disabled={status === "submitting"}>
+          {status === "submitting" ? "Adding…" : buttonLabel}
+        </button>
+      </form>
+      {status === "error" && (
+        <p style={{ color: "#dc2626", fontSize: 13, marginTop: 8 }}>
+          Something went wrong. Please try again in a moment.
+        </p>
+      )}
+    </div>
   );
 }
 

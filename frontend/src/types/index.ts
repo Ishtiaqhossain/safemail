@@ -92,6 +92,13 @@ export interface AllowedEmail {
   created_at: string;
 }
 
+export interface WaitlistEntry {
+  id: string;
+  email: string;
+  source: string | null;
+  created_at: string;
+}
+
 export interface LlmUsagePeriod {
   calls: number;
   input_tokens: number;

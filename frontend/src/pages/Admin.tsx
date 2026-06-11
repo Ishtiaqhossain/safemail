@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { adminApi } from "@/api/admin";
-import type { AdminOverview, AdminEvent, TaskLogEntry, LlmStats, AllowedEmail } from "@/types";
+import type { AdminOverview, AdminEvent, TaskLogEntry, LlmStats, AllowedEmail, WaitlistEntry } from "@/types";
 
-type Tab = "overview" | "llm" | "allowlist" | "events" | "tasks";
+type Tab = "overview" | "llm" | "allowlist" | "waitlist" | "events" | "tasks";
 
 const fmtNum = (n: number) => n.toLocaleString();
 const fmtCost = (n: number) => (n === 0 ? "$0.00" : n < 0.01 ? "< $0.01" : `$${n.toFixed(n >= 1 ? 2 : 4)}`);
@@ -461,6 +461,78 @@ function AllowlistTab() {
   );
 }
 
+// ── Waitlist Tab ──────────────────────────────────────────────────────────────
+
+function WaitlistTab() {
+  const [items, setItems] = useState<WaitlistEntry[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = () => adminApi.getWaitlist().then(setItems).catch(() => setItems([]));
+  useEffect(() => { load(); }, []);
+
+  const approve = async (entry: WaitlistEntry) => {
+    if (!confirm(`Approve ${entry.email}? They'll be added to the allowlist and can register.`)) return;
+    setBusy(entry.id);
+    try { await adminApi.approveWaitlistEntry(entry.id); await load(); }
+    finally { setBusy(null); }
+  };
+
+  const remove = async (entry: WaitlistEntry) => {
+    if (!confirm(`Remove ${entry.email} from the waitlist?`)) return;
+    setBusy(entry.id);
+    try { await adminApi.removeWaitlistEntry(entry.id); await load(); }
+    finally { setBusy(null); }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <p style={{ fontSize: 13, color: "#64748b", margin: 0 }}>
+        Invite requests from the public landing page. Approving an entry adds it to the allowlist (so they can register) and removes it from the waitlist.
+      </p>
+
+      <Card>
+        {items === null ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Loading…</div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Source</th>
+                <th>Requested</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.length === 0 ? (
+                <tr><td colSpan={4} style={{ textAlign: "center", color: "#94a3b8", padding: 32 }}>No invite requests yet</td></tr>
+              ) : items.map((it) => (
+                <tr key={it.id}>
+                  <td style={{ fontFamily: "monospace", fontSize: 13 }}>{it.email}</td>
+                  <td style={{ color: "#64748b", fontSize: 13 }}>{it.source ?? "—"}</td>
+                  <td style={{ color: "#94a3b8", fontSize: 13, whiteSpace: "nowrap" }}>{new Date(it.created_at).toLocaleDateString()}</td>
+                  <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    <button onClick={() => approve(it)} disabled={busy === it.id}
+                            style={{ padding: "4px 10px", background: "#2563eb", border: "none",
+                                     color: "#fff", borderRadius: 6, fontSize: 12, cursor: "pointer", marginRight: 8 }}>
+                      Approve
+                    </button>
+                    <button onClick={() => remove(it)} disabled={busy === it.id}
+                            style={{ padding: "4px 10px", background: "#fff", border: "1px solid #fecaca",
+                                     color: "#dc2626", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Admin() {
@@ -475,7 +547,7 @@ export default function Admin() {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #e2e8f0", marginBottom: 24 }}>
-        {(["overview", "llm", "allowlist", "events", "tasks"] as Tab[]).map((t) => (
+        {(["overview", "llm", "allowlist", "waitlist", "events", "tasks"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -497,6 +569,7 @@ export default function Admin() {
       {tab === "overview"  && <OverviewTab />}
       {tab === "llm"       && <LlmTab />}
       {tab === "allowlist" && <AllowlistTab />}
+      {tab === "waitlist"  && <WaitlistTab />}
       {tab === "events"    && <EventsTab />}
       {tab === "tasks"     && <TasksTab />}
     </div>

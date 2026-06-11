@@ -1,5 +1,5 @@
 import api from "./client";
-import type { AdminOverview, AdminEvent, TaskLogEntry, LlmStats, AllowedEmail } from "@/types";
+import type { AdminOverview, AdminEvent, TaskLogEntry, LlmStats, AllowedEmail, WaitlistEntry } from "@/types";
 
 interface PagedResponse<T> {
   data: T[];
@@ -25,4 +25,13 @@ export const adminApi = {
 
   removeAllowedEmail: (id: string) =>
     api.delete(`/admin/allowlist/${id}`).then((r) => r.data),
+
+  getWaitlist: () =>
+    api.get<{ data: WaitlistEntry[] }>("/admin/waitlist").then((r) => r.data.data),
+
+  approveWaitlistEntry: (id: string) =>
+    api.post(`/admin/waitlist/${id}/approve`).then((r) => r.data),
+
+  removeWaitlistEntry: (id: string) =>
+    api.delete(`/admin/waitlist/${id}`).then((r) => r.data),
 };

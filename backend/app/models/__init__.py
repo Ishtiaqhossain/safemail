@@ -6,5 +6,6 @@ from app.models.alert_preference import AlertPreference
 from app.models.weekly_stats import WeeklyStats
 from app.models.task_log import TaskLog
 from app.models.allowed_email import AllowedEmail
+from app.models.waitlist_entry import WaitlistEntry
 
-__all__ = ["Parent", "Child", "GmailConnection", "Alert", "AlertPreference", "WeeklyStats", "TaskLog", "AllowedEmail"]
+__all__ = ["Parent", "Child", "GmailConnection", "Alert", "AlertPreference", "WeeklyStats", "TaskLog", "AllowedEmail", "WaitlistEntry"]

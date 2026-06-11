@@ -31,3 +31,5 @@ RESEND_VERIFICATION_LIMIT = "3/minute"
 # Developer-only Claude playground; capped so a compromised dev session can't
 # run up unbounded API cost.
 CLASSIFY_LIMIT = "10/minute"
+# Public, unauthenticated landing-page waitlist signup.
+WAITLIST_LIMIT = "5/minute"

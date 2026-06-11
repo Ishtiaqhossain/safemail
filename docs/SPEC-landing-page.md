@@ -216,9 +216,12 @@ All boxes checked + build/lint green + manual checklist passed.
    do these pages exist somewhere? (Default: `#` placeholders.)
 3. **"Free during the alpha" claim:** confirm accurate to say publicly. (Default: keep,
    since registration is free for allowlisted users.)
-4. **Proper waitlist capture (future):** the honest invite funnel currently routes to
-   the register form, where non-allowlisted emails see the backend's invite-only
-   message. A real "request an invite" experience would need a backend waitlist endpoint
-   to actually store the email and notify them — out of scope here (ask-first boundary),
-   flagged as the natural follow-up.
+4. **Proper waitlist capture:** ✅ **BUILT (follow-up, approved).** The landing CTA now
+   POSTs to a real, rate-limited public endpoint `POST /v1/waitlist` that stores the
+   email in a new `waitlist_entries` table (idempotent, normalized) and shows an inline
+   "You're on the list" confirmation — it no longer routes to the register form. Admins
+   review requests in a new **Waitlist** tab (`GET /admin/waitlist`) and can **Approve**
+   (promotes to the allowlist so the person can register, via
+   `POST /admin/waitlist/{id}/approve`) or **Remove** (`DELETE /admin/waitlist/{id}`).
+   Migration: `20260611_d4e5f6a7b8c9_add_waitlist.py`.
 ```
