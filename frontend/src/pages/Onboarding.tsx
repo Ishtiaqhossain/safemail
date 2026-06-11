@@ -5,7 +5,7 @@ import { onboardingApi } from "@/api/onboarding";
 import { setOnboardingCompleted } from "@/api/client";
 
 const STEP_LABELS = ["Welcome", "How it works", "Consent", "Add child", "Connect Gmail", "Done"];
-const LS_KEY = "sm_onboarding";
+export const LS_KEY = "sm_onboarding";
 
 const DETECTION = [
   ["🆘", "Self-harm"],

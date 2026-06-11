@@ -4,6 +4,7 @@ import { childrenApi } from "@/api/children";
 import { alertsApi } from "@/api/alerts";
 import { authApi } from "@/api/auth";
 import { clearAccessToken } from "@/api/client";
+import { LS_KEY } from "@/pages/Onboarding";
 import type { Child, AlertPreference, Severity, Category } from "@/types";
 
 const SEVERITIES: { value: Severity; label: string; color: string; bg: string }[] = [
@@ -108,6 +109,11 @@ export default function Settings() {
       setDeleting(false);
       alert("Something went wrong deleting your account. Please try again.");
     }
+  };
+
+  const viewSetupGuide = () => {
+    localStorage.removeItem(LS_KEY); // start the wizard fresh at step 1
+    navigate("/onboarding");
   };
 
   const savePref = async (childId: string, pref: AlertPreference) => {
@@ -352,8 +358,24 @@ export default function Settings() {
         </div>
       )}
 
+      {/* Setup guide */}
+      <div style={{ marginTop: 28, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "22px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+        <div>
+          <h2 style={{ marginBottom: 4, fontSize: 15 }}>Setup guide</h2>
+          <p style={{ color: "#64748b", fontSize: 13, margin: 0, lineHeight: 1.5 }}>
+            Walk through the SafeMail setup and privacy overview again.
+          </p>
+        </div>
+        <button
+          onClick={viewSetupGuide}
+          style={{ padding: "8px 18px", background: "#fff", color: "#2563eb", border: "1px solid #bfdbfe", borderRadius: 7, fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", cursor: "pointer" }}
+        >
+          View setup guide
+        </button>
+      </div>
+
       {/* Danger zone */}
-      <div style={{ marginTop: 36, background: "#fff", border: "1px solid #fecaca", borderRadius: 12, padding: "22px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+      <div style={{ marginTop: 28, background: "#fff", border: "1px solid #fecaca", borderRadius: 12, padding: "22px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
         <h2 style={{ marginBottom: 4, fontSize: 15, color: "#dc2626" }}>Delete account</h2>
         <p style={{ color: "#64748b", fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
           Permanently delete your account and all associated data — every child,
