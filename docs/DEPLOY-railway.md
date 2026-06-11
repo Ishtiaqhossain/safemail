@@ -6,120 +6,198 @@ app code; if you ever leave Railway, the compose stack still runs anywhere.
 
 The stack is **four app services** (api, worker, beat, frontend) plus Railway's
 **managed Postgres and Redis**. `backend/railway.json` and `frontend/railway.json`
-pin the Docker builder; per-service settings below are set in the dashboard
+pin the Docker builder; per-service settings are configured in the dashboard
 because the three backend services share one directory.
+
+This guide uses the **dashboard** flow (easier than the CLI for a first
+multi-service deploy).
 
 ---
 
-## 0. Prerequisites
-- A Railway account + a new **Project** (`railway init` or the dashboard).
-- This repo connected to the project (GitHub integration).
-- Fresh production secrets (do **not** reuse local-dev values). See
-  `.env.production.example` for the full list.
+## Step 0 — Generate production secrets locally first
 
-## 1. Add managed datastores
-In the project: **New → Database → PostgreSQL**, then again **→ Redis**.
-Railway exposes connection variables you'll reference below
-(`${{Postgres.DATABASE_URL}}`, `${{Redis.REDIS_URL}}`).
+Run these on your machine and keep the output handy. **Generate fresh values** —
+do not reuse local-dev secrets.
 
-## 2. Shared variables (set once at the project level)
-Project → **Variables** → add the secrets every backend service needs. Using
-shared/reference variables means you set them once:
+```bash
+cd ~/openbark
+
+# 1. RSA keypair for JWT
+openssl genrsa -out prod_private.pem 2048
+openssl rsa -in prod_private.pem -pubout -out prod_public.pem
+
+# 2. Convert each PEM to a single line with \n escapes
+#    (Railway variables can't hold real newlines; the app restores them).
+awk 'NF {printf "%s\\n", $0}' prod_private.pem    # -> paste as JWT_PRIVATE_KEY
+awk 'NF {printf "%s\\n", $0}' prod_public.pem     # -> paste as JWT_PUBLIC_KEY
+
+# 3. Fernet key (encrypts stored OAuth tokens)
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"   # -> FERNET_KEY
+```
+
+You'll also need your existing **Google OAuth client ID/secret**, **Anthropic API
+key**, and **SendGrid key**.
+
+> After pasting the keys into Railway, delete `prod_private.pem` /
+> `prod_public.pem` — they shouldn't sit on disk.
+
+## Step 1 — Create the project + datastores
+
+1. [railway.com](https://railway.com) -> **New Project** -> **Deploy from GitHub
+   repo** -> pick `Ishtiaqhossain/safemail` (authorize Railway on the repo if
+   prompted).
+2. It creates one service — that's fine, you'll configure it as the **api** in
+   Step 3.
+3. In the project canvas: **+ New -> Database -> Add PostgreSQL**. Again:
+   **+ New -> Database -> Add Redis**.
+
+## Step 2 — Set shared variables
+
+Project (not a service) -> **Variables** tab -> add the secrets every backend
+service shares:
 
 ```
 DEBUG=false
 COOKIE_SECURE=true
 INVITE_ONLY_ENABLED=true
-FERNET_KEY=...
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-ANTHROPIC_API_KEY=...
-SENDGRID_API_KEY=...
-JWT_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----
-JWT_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----
+FERNET_KEY=<from step 0>
+GOOGLE_CLIENT_ID=<yours>
+GOOGLE_CLIENT_SECRET=<yours>
+ANTHROPIC_API_KEY=<yours>
+SENDGRID_API_KEY=<yours>
+JWT_PRIVATE_KEY=<escaped PEM from step 0>
+JWT_PUBLIC_KEY=<escaped PEM from step 0>
 ```
 
-Notes:
-- **JWT keys**: paste the PEM **contents** with `\n` for newlines (the app
-  restores them). Generate with
-  `openssl genrsa -out private.pem 2048 && openssl rsa -in private.pem -pubout -out public.pem`.
-- `DATABASE_URL` / `REDIS_URL` are set **per backend service** in step 3 as
-  references (so they resolve to the managed add-ons).
+## Step 3 — Configure the three backend services
 
-## 3. Create the backend services (api, worker, beat)
-Create three services from the repo, each with **Root Directory = `backend`**
-(they all use `backend/Dockerfile` via `backend/railway.json`). They differ only
-in start command and a couple of vars:
+Each uses **Root Directory = `backend`** (so it builds `backend/Dockerfile` via
+`backend/railway.json`).
 
-| Service | Custom Start Command | Extra variables |
-|---|---|---|
-| **api** | *(leave default — uses the Dockerfile entrypoint)* | `RUN_MIGRATIONS=true` |
-| **worker** | `celery -A app.worker worker -l info -c 4` | — |
-| **beat** | `celery -A app.worker beat -l info` | — |
+**api** (the service auto-created in Step 1):
+- Settings -> **Source** -> Root Directory: `backend`
+- Settings -> **Variables** (in addition to the shared ones):
+  ```
+  DATABASE_URL=${{Postgres.DATABASE_URL}}
+  REDIS_URL=${{Redis.REDIS_URL}}
+  RUN_MIGRATIONS=true
+  PORT=8000
+  ```
+- Settings -> **Deploy -> Healthcheck Path**: `/health`
+- Leave **Custom Start Command empty** — it must use the Dockerfile entrypoint so
+  migrations run.
 
-For **every** backend service, add these reference variables:
-```
-DATABASE_URL=${{Postgres.DATABASE_URL}}
-REDIS_URL=${{Redis.REDIS_URL}}
-```
-(The app normalizes the `postgres://` scheme to asyncpg automatically.)
+**worker** — **+ New -> GitHub Repo -> same repo**:
+- Root Directory: `backend`
+- Variables: `DATABASE_URL=${{Postgres.DATABASE_URL}}`,
+  `REDIS_URL=${{Redis.REDIS_URL}}` (no `RUN_MIGRATIONS`)
+- Settings -> Deploy -> **Custom Start Command**:
+  `celery -A app.worker worker -l info -c 4`
+
+**beat** — another new service from the repo:
+- Root Directory: `backend`
+- Same two reference vars
+- Custom Start Command: `celery -A app.worker beat -l info`
 
 Why these settings:
 - Only **api** sets `RUN_MIGRATIONS=true`, so its entrypoint runs
-  `alembic upgrade head` once on deploy; worker/beat skip it (no migration race).
-- **api** keeps the default start command so the entrypoint (migrations) runs;
-  worker/beat override it with their Celery commands.
-- **api**: set **Health Check Path** = `/health` in its service settings.
-- The api listens on Railway's `$PORT` automatically (Dockerfile `CMD`).
+  `alembic upgrade head` once per deploy; worker/beat skip it (no migration race).
+- **api** keeps the default start command so the entrypoint runs; worker/beat
+  override it with their Celery commands.
+- The app normalizes the `postgres://` scheme from `DATABASE_URL` to asyncpg
+  automatically.
 
-## 4. Create the frontend service
-New service, **Root Directory = `frontend`** (uses `frontend/Dockerfile` +
-`frontend/railway.json`, health check `/`). It serves the SPA and reverse-proxies
-`/v1` to the API so everything is **same-origin** (the `SameSite=Strict` refresh
-cookie works, no CORS).
+> **Reference-var note:** if Railway named your DB services something other than
+> `Postgres`/`Redis`, use the actual names in `${{ServiceName.DATABASE_URL}}`.
+> The variable editor autocompletes them.
 
-Set on the frontend service:
+## Step 4 — Configure the frontend service
+
+**+ New -> GitHub Repo -> same repo**:
+- Root Directory: `frontend` (uses `frontend/Dockerfile` + `frontend/railway.json`,
+  health check `/`).
+- Variable: `API_UPSTREAM=${{api.RAILWAY_PRIVATE_DOMAIN}}:8000` — points nginx at
+  the api over Railway's private network (this is why we pinned api `PORT=8000`).
+- Settings -> Networking -> **Generate Domain** (gives `something.up.railway.app`).
+
+The frontend serves the SPA and reverse-proxies `/v1` to the api, so everything
+is **same-origin** (the `SameSite=Strict` refresh cookie works, no CORS).
+
+> nginx resolves the api hostname when it starts, so if the frontend boots before
+> the api is reachable it may crash once and restart. That's expected — the
+> `ON_FAILURE` restart policy recovers it once the api is up. Deploy the api
+> first (Step 6) to avoid the extra restart.
+
+## Step 5 — Wire URLs + Google OAuth
+
+Once you have the frontend domain, add to **shared variables** (or the api
+service):
 ```
-API_UPSTREAM=${{api.RAILWAY_PRIVATE_DOMAIN}}:8000
+FRONTEND_URL=https://<frontend-domain>
+GOOGLE_REDIRECT_URI=https://<frontend-domain>/v1/auth/google/callback
 ```
-This points nginx at the api over Railway's private network. (Pin the api to a
-fixed internal port by setting `PORT=8000` on the **api** service so the upstream
-address is stable.)
+(`/v1` is proxied to the api, so OAuth rides the same domain — no separate api
+domain needed.)
 
-> nginx resolves the api hostname when it starts, so if the frontend boots
-> before the api is reachable it may crash once and restart. That's expected —
-> the `ON_FAILURE` restart policy recovers it automatically once the api is up.
-> Deploy the api first to avoid the extra restart.
+Then in [Google Cloud Console](https://console.cloud.google.com) -> **APIs &
+Services -> Credentials -> your OAuth client**:
+- **Authorized redirect URIs**: add
+  `https://<frontend-domain>/v1/auth/google/callback`
+- **Authorized JavaScript origins**: add `https://<frontend-domain>`
 
-## 5. Domains & OAuth
-- Generate a public domain for the **frontend** service (Settings → Networking →
-  Generate Domain), or attach a custom domain.
-- Set these (shared or on api) to the frontend's public URL:
-  ```
-  FRONTEND_URL=https://<your-frontend-domain>
-  GOOGLE_REDIRECT_URI=https://<your-frontend-domain>/v1/auth/google/callback
-  ```
-  (`/v1` is proxied to the api, so the callback rides the same domain.)
-- In the **Google Cloud console**, add that redirect URI and the frontend origin
-  to the OAuth client's authorized lists.
+## Step 6 — Deploy in the right order
 
-## 6. Deploy & verify
-Deploy all services. Then, against the frontend's public URL:
-- `GET /` returns the app; `GET /v1/...` reaches the API (proxy works).
-- Check the **api** deploy logs show `alembic upgrade head` ran.
-- Register a parent → the verification email arrives (once PR3's domain email is
-  set up) → log in → dashboard loads.
-- Add a child → Google OAuth completes against the production redirect URI.
+Deploy **api first** (so the frontend's nginx can resolve it on boot), then
+worker, beat, frontend. Watch the **api deploy logs** for
+`Running upgrade ... alembic upgrade head` followed by
+`Application startup complete`.
 
-## Bootstrapping the first admin
+## Step 7 — Verify
+
+Against `https://<frontend-domain>`:
+- `GET /` loads the app; `GET /v1/...` reaches the API (proxy works).
+- Register an account -> succeeds (the first account bypasses the invite gate).
+- Log in -> dashboard loads (JWT signs/verifies from env keys; same-origin cookie).
+- Add a child -> "Connect Gmail" -> Google OAuth completes back to your domain.
+- (Once PR3's domain email is set up) the verification email arrives, not in spam.
+
+## Step 8 — Make yourself the first admin
+
 `INVITE_ONLY_ENABLED=true` blocks registration except the **very first** account
-(empty `parents` table). Register yourself first, then promote in the Railway
-Postgres console:
+(empty `parents` table). Register yourself first, then open the **Postgres service
+-> Data / Query tab** and run:
 ```sql
 UPDATE parents SET is_admin = true, is_developer = true WHERE email = 'you@example.com';
 ```
+Log out and back in to pick up the new claims.
+
+---
+
+## Troubleshooting
+
+**Frontend keeps restarting / 502 on `/v1`.** The private-network proxy
+(`API_UPSTREAM`) is the likeliest culprit. Confirm the **api** service is healthy
+and that you set `PORT=8000` on it (so `${{api.RAILWAY_PRIVATE_DOMAIN}}:8000` is
+correct). Railway's internal DNS is IPv6 and nginx resolves the upstream at
+startup; redeploy the frontend after the api is up. If it still fails, point
+`API_UPSTREAM` at the api's **public** domain instead — that needs an HTTPS
+upstream in nginx, so open an issue / ask and we'll adjust `nginx.conf.template`.
+
+**`/docs` returns 404.** Expected in production — Swagger is disabled when
+`DEBUG=false`.
+
+**App won't boot, logs mention "Missing required production settings".** A
+required secret (`FERNET_KEY` / `GOOGLE_CLIENT_SECRET` / `ANTHROPIC_API_KEY` /
+`SENDGRID_API_KEY`) is unset on that service. The fail-fast check naming the
+missing key is intentional.
+
+**Login works but stays logged out after refresh.** The refresh cookie isn't
+sticking — check the frontend and api ride the **same domain** via the `/v1`
+proxy (don't set `VITE_API_BASE_URL` to a separate api domain), and that
+`COOKIE_SECURE=true` with HTTPS.
 
 ## Cost
+
 ~$13–16/mo at beta traffic (metered): api/worker/beat hold ~200–300 MB RAM each,
-Postgres + Redis are usage-billed, frontend is light. The $5 Hobby plan credit
-offsets part of it.
+Postgres + Redis are usage-billed, the frontend is light. The $5 Hobby plan
+credit offsets part of it.
