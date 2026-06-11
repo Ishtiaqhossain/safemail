@@ -118,7 +118,7 @@ export default function Dashboard() {
         <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 18 }}>🛡️</span>
           <span style={{ fontSize: 14, color: "#1e40af", flex: 1 }}>
-            Finish setting up SafeMail — connect a child's Gmail to start monitoring.
+            Finish setting up SafeMail — connect a child's Gmail to start monitoring. (Gmail only for now.)
           </span>
           <Link to="/onboarding" style={{ background: "#2563eb", color: "#fff", padding: "5px 14px", borderRadius: 6, fontSize: 13, fontWeight: 500, textDecoration: "none" }}>
             Finish setup

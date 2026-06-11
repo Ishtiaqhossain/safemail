@@ -189,6 +189,9 @@ export default function Onboarding() {
                 </p>
               </div>
               <PrimaryBtn onClick={connectGmail} disabled={busy}>{busy ? "Opening Google…" : "Connect Gmail"}</PrimaryBtn>
+              <p style={{ fontSize: 12.5, color: "#94a3b8", textAlign: "center", margin: "10px 0 0", lineHeight: 1.5 }}>
+                Only Gmail and Google accounts are supported right now — support for other providers is coming.
+              </p>
               <button onClick={() => setStep(5)} style={textBtn}>I'll connect it later</button>
               <BackLink onClick={() => setStep(3)} />
             </Step>

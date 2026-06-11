@@ -231,12 +231,17 @@ export default function Settings() {
                       ))}
                     </div>
                   ) : (
-                    <button
-                      onClick={() => childrenApi.connectGmail(child.id)}
-                      style={{ padding: "8px 16px", background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", borderRadius: 7, fontSize: 13, fontWeight: 500 }}
-                    >
-                      + Connect Gmail account
-                    </button>
+                    <div>
+                      <button
+                        onClick={() => childrenApi.connectGmail(child.id)}
+                        style={{ padding: "8px 16px", background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", borderRadius: 7, fontSize: 13, fontWeight: 500 }}
+                      >
+                        + Connect Gmail account
+                      </button>
+                      <p style={{ fontSize: 12, color: "#94a3b8", margin: "8px 0 0" }}>
+                        We currently support Gmail / Google accounts only.
+                      </p>
+                    </div>
                   )}
                 </div>
 

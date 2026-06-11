@@ -58,8 +58,8 @@ const FAQS = [
     a: "It's free during the alpha. No credit card required to get started.",
   },
   {
-    q: "Does it work with a school Google account?",
-    a: "Yes. SafeMail works with any Gmail or Google Workspace (including G Suite for Education) account, as long as you can complete the one-time Google sign-in.",
+    q: "Which email providers are supported?",
+    a: "Right now, Gmail and Google Workspace accounts — including school / G Suite for Education addresses — connected with a one-time Google sign-in. Other providers like Outlook, Yahoo, and iCloud aren't supported yet.",
   },
   {
     q: "Will my child know it's there?",
