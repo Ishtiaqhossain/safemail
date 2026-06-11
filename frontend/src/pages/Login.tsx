@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
-import { setAccessToken, setIsAdmin, setIsDeveloper, setIsEmailVerified } from "@/api/client";
+import { setAccessToken, setIsAdmin, setIsDeveloper, setIsEmailVerified, setOnboardingCompleted } from "@/api/client";
 
 export default function Login({ onLogin }: { onLogin?: () => void }) {
   const navigate = useNavigate();
@@ -26,8 +26,11 @@ export default function Login({ onLogin }: { onLogin?: () => void }) {
       setIsAdmin(data.is_admin ?? false);
       setIsDeveloper(data.is_developer ?? false);
       setIsEmailVerified(data.is_email_verified ?? true);
+      setOnboardingCompleted(data.onboarding_completed ?? true);
       onLogin?.();
-      navigate("/dashboard");
+      // New / un-onboarded users go through the wizard; the route guard also
+      // enforces this, so we just send everyone to the dashboard.
+      navigate(data.onboarding_completed === false ? "/onboarding" : "/dashboard");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Something went wrong";
       setError(msg);

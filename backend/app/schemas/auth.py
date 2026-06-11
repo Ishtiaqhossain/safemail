@@ -18,6 +18,8 @@ class TokenResponse(BaseModel):
     is_admin: bool = False
     is_developer: bool = False
     is_email_verified: bool = True
+    onboarding_completed: bool = True
+    monitoring_consent: bool = False
 
 
 class ForgotPasswordRequest(BaseModel):

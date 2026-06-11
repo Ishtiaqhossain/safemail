@@ -6,6 +6,7 @@ let accessToken: string | null = null;
 let adminFlag = false;
 let developerFlag = false;
 let emailVerifiedFlag = true;
+let onboardingCompletedFlag = true;
 
 export function setAccessToken(token: string) {
   accessToken = token;
@@ -16,6 +17,7 @@ export function clearAccessToken() {
   adminFlag = false;
   developerFlag = false;
   emailVerifiedFlag = true;
+  onboardingCompletedFlag = true;
 }
 
 export function setIsAdmin(v: boolean) { adminFlag = v; }
@@ -24,6 +26,8 @@ export function setIsDeveloper(v: boolean) { developerFlag = v; }
 export function getIsDeveloper() { return developerFlag; }
 export function setIsEmailVerified(v: boolean) { emailVerifiedFlag = v; }
 export function getIsEmailVerified() { return emailVerifiedFlag; }
+export function setOnboardingCompleted(v: boolean) { onboardingCompletedFlag = v; }
+export function getOnboardingCompleted() { return onboardingCompletedFlag; }
 
 export function isAuthenticated() {
   return !!accessToken;
@@ -36,6 +40,7 @@ export async function tryRefresh(): Promise<boolean> {
     setIsAdmin(data.is_admin ?? false);
     setIsDeveloper(data.is_developer ?? false);
     setIsEmailVerified(data.is_email_verified ?? true);
+    setOnboardingCompleted(data.onboarding_completed ?? true);
     return true;
   } catch {
     return false;
