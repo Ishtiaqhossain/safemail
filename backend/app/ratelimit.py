@@ -28,3 +28,6 @@ REFRESH_LIMIT = "60/minute"
 FORGOT_PASSWORD_LIMIT = "3/minute"
 RESET_PASSWORD_LIMIT = "5/minute"
 RESEND_VERIFICATION_LIMIT = "3/minute"
+# Developer-only Claude playground; capped so a compromised dev session can't
+# run up unbounded API cost.
+CLASSIFY_LIMIT = "10/minute"

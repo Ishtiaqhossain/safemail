@@ -70,7 +70,8 @@ def create_refresh_token(parent_id: uuid.UUID) -> str:
     _load_keys()
     expire = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
     return jwt.encode(
-        {"sub": str(parent_id), "exp": expire, "type": "refresh"},
+        {"sub": str(parent_id), "jti": str(uuid.uuid4()),
+         "exp": expire, "type": "refresh"},
         _private_key,
         algorithm=settings.jwt_algorithm,
     )

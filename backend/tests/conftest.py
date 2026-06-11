@@ -8,6 +8,10 @@ os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 # freshly registered parent wouldn't be on the allowlist and login would 403.
 os.environ.setdefault("INVITE_ONLY_ENABLED", "false")
 
+# Run the app in debug so the production secret-validation in config.py doesn't
+# fail at import when a CI environment has no .env.
+os.environ.setdefault("DEBUG", "true")
+
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker

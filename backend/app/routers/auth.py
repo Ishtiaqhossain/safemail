@@ -23,6 +23,7 @@ from app.auth import (
 )
 from app.services.crypto import encrypt_token, decrypt_token
 from app.services.gmail import revoke_token
+from app.services import token_denylist
 from app.models.allowed_email import AllowedEmail
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, ForgotPasswordRequest, ResetPasswordRequest
 from app.ratelimit import (
@@ -132,6 +133,9 @@ async def refresh(request: Request, db: Annotated[AsyncSession, Depends(get_db)]
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
+    if await token_denylist.is_revoked(payload.get("jti")):
+        raise HTTPException(status_code=401, detail="Refresh token has been revoked")
+
     result = await db.execute(select(Parent).where(Parent.id == uuid.UUID(payload["sub"])))
     parent = result.scalar_one_or_none()
     if not parent:
@@ -148,7 +152,18 @@ async def refresh(request: Request, db: Annotated[AsyncSession, Depends(get_db)]
 
 
 @router.post("/logout")
-async def logout(response: Response):
+async def logout(request: Request, response: Response):
+    # Revoke the refresh token server-side so it can't mint new access tokens
+    # after logout, then clear the cookie. Best-effort: a malformed/expired
+    # token has nothing to revoke.
+    token = request.cookies.get("refresh_token")
+    if token:
+        try:
+            payload = decode_token(token)
+            ttl = int(payload["exp"] - datetime.now(timezone.utc).timestamp())
+            await token_denylist.revoke(payload.get("jti"), ttl)
+        except Exception:
+            pass
     response.delete_cookie("refresh_token")
     return {"detail": "Logged out"}
 
@@ -224,9 +239,6 @@ async def reset_password(request: Request, body: ResetPasswordRequest, db: Annot
     parent = result.scalar_one_or_none()
     if not parent:
         raise invalid
-
-    if len(body.new_password) < 8:
-        raise HTTPException(status_code=422, detail="Password must be at least 8 characters.")
 
     parent.password_hash = hash_password(body.new_password)
     await db.commit()

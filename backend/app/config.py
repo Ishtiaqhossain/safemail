@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,6 +28,11 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
     cookie_secure: bool = False
 
+    # Production hardening. When False (the production default): Swagger/redoc are
+    # disabled, 500s return a generic body instead of the exception text, and
+    # startup fails fast if required secrets are missing. Set DEBUG=true locally.
+    debug: bool = False
+
     confidence_threshold: float = 0.70
     max_body_length: int = 8000
     alert_poll_interval_minutes: int = 5
@@ -37,6 +43,21 @@ class Settings(BaseSettings):
     # Invite-only alpha: only allowlisted emails may register / log in.
     # Set False to open registration for public launch.
     invite_only_enabled: bool = True
+
+    _REQUIRED_IN_PROD = ("fernet_key", "google_client_secret", "anthropic_api_key", "sendgrid_api_key")
+
+    @model_validator(mode="after")
+    def _require_secrets_in_prod(self) -> "Settings":
+        # Fail fast on boot if a production deploy (DEBUG=false) is missing a
+        # secret, instead of surfacing as a 500 on the first request that needs it.
+        if not self.debug:
+            missing = [name for name in self._REQUIRED_IN_PROD if not getattr(self, name)]
+            if missing:
+                raise ValueError(
+                    "Missing required production settings (set these, or DEBUG=true for local dev): "
+                    + ", ".join(missing)
+                )
+        return self
 
 
 @lru_cache

@@ -5,8 +5,8 @@ pytestmark = pytest.mark.asyncio
 
 
 async def _auth_header(client: AsyncClient, email: str = "alert_parent@example.com") -> dict:
-    await client.post("/v1/auth/register", json={"email": email, "password": "pass123"})
-    resp = await client.post("/v1/auth/login", json={"email": email, "password": "pass123"})
+    await client.post("/v1/auth/register", json={"email": email, "password": "pass1234"})
+    resp = await client.post("/v1/auth/login", json={"email": email, "password": "pass1234"})
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 

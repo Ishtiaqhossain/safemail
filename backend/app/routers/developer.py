@@ -3,7 +3,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Annotated
 
 import redis as redis_lib
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -11,6 +11,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app.auth import get_current_developer
 from app.config import get_settings
+from app.ratelimit import limiter, CLASSIFY_LIMIT
 from app.models.parent import Parent
 from app.models.child import Child
 from app.models.gmail_connection import GmailConnection
@@ -183,7 +184,9 @@ class ClassifyRequest(BaseModel):
 
 
 @router.post("/classify")
+@limiter.limit(CLASSIFY_LIMIT)
 async def classify(
+    request: Request,
     body: ClassifyRequest,
     _: Annotated[Parent, Depends(get_current_developer)],
     db: Annotated[AsyncSession, Depends(get_db)],
