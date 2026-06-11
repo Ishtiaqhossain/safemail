@@ -4,34 +4,38 @@ import os
 # so repeated login/register calls in tests aren't throttled.
 os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
-import pytest
+# Disable the invite-only gate too — each test starts from a clean DB, so a
+# freshly registered parent wouldn't be on the allowlist and login would 403.
+os.environ.setdefault("INVITE_ONLY_ENABLED", "false")
+
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.main import app
 from app.database import Base, get_db
 
 TEST_DB_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/safemail_test"
 
-test_engine = create_async_engine(TEST_DB_URL, echo=False)
-TestSessionLocal = async_sessionmaker(test_engine, expire_on_commit=False)
-
-
-@pytest_asyncio.fixture(scope="session", autouse=True)
-async def setup_db():
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
 
 @pytest_asyncio.fixture
 async def db():
-    async with TestSessionLocal() as session:
+    # A fresh engine per test, created inside the test's own event loop. NullPool
+    # means connections are never pooled across loops — which is what previously
+    # caused "attached to a different loop" errors under pytest-asyncio's
+    # per-test loops. drop+create gives each test a clean schema.
+    engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+
+    SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+    async with SessionLocal() as session:
         yield session
         await session.rollback()
+
+    await engine.dispose()
 
 
 @pytest_asyncio.fixture

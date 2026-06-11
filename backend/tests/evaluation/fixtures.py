@@ -23,8 +23,10 @@ class EmailFixture:
 def _msg(direction="inbound", sender="someone@example.com", subject="", body="") -> dict:
     return {
         "gmail_message_id": "test",
-        "gmail_connection_id": "test",
-        "child_id": "test",
+        # child_id / gmail_connection_id are parsed as UUIDs by analyze_message,
+        # so they must be valid UUID strings, not arbitrary placeholders.
+        "gmail_connection_id": "00000000-0000-0000-0000-0000000000c0",
+        "child_id": "00000000-0000-0000-0000-0000000000c1",
         "direction": direction,
         "sender_address": sender,
         "recipient_addresses": ["child@gmail.com"],
@@ -406,7 +408,6 @@ PERSONAL_INFO = [
         description="Personal info LOW — sharing first name only",
         expected_severity="low",
         expected_category="personal_info_sharing",
-        direction="outbound",
         message=_msg(
             direction="outbound",
             sender="child@gmail.com",

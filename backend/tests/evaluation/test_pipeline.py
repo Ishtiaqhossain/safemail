@@ -11,7 +11,15 @@ import pytest_asyncio
 from unittest.mock import patch, MagicMock
 from sqlalchemy import select
 
+from app.models.alert import Alert
 from tests.evaluation.fixtures import SELF_HARM, GROOMING, BULLYING, BENIGN
+
+
+def _added_alerts(mock_db) -> list:
+    """Alerts passed to db.add(). analyze_message also adds a TaskLog on every
+    scan, so assertions must filter for Alert instances rather than count raw
+    db.add() calls."""
+    return [c.args[0] for c in mock_db.add.call_args_list if isinstance(c.args[0], Alert)]
 
 
 pytestmark = pytest.mark.asyncio
@@ -101,7 +109,7 @@ class TestConfidenceThreshold:
             from app.tasks.analysis import analyze_message
             analyze_message(GROOMING[1].message)
 
-            mock_db.add.assert_not_called()
+            assert _added_alerts(mock_db) == []
 
     def test_high_confidence_result_creates_alert(self):
         """Results at or above 0.70 confidence must create an alert."""
@@ -124,7 +132,7 @@ class TestConfidenceThreshold:
             from app.tasks.analysis import analyze_message
             analyze_message(GROOMING[1].message)
 
-            mock_db.add.assert_called_once()
+            assert len(_added_alerts(mock_db)) == 1
 
 
 # ─────────────────────────────────────────────
@@ -160,8 +168,8 @@ class TestDeduplication:
 class TestNotificationRouting:
     def _run_deliver(self, severity: str, immediate_severities: list[str]):
         with patch("app.tasks.analysis.SyncSessionLocal") as MockSession, \
-             patch("app.tasks.analysis.send_alert_email") as mock_email, \
-             patch("app.tasks.analysis.send_push_notification") as mock_push:
+             patch("app.services.notifications.send_alert_email") as mock_email, \
+             patch("app.services.notifications.send_push_notification") as mock_push:
 
             mock_alert = MagicMock()
             mock_alert.severity = severity
