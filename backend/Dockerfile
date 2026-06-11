@@ -20,4 +20,6 @@ USER appuser
 # --proxy-headers so the real client IP (for rate limiting) is read from the
 # proxy; $PORT lets hosts that assign their own port work unchanged.
 ENTRYPOINT ["./entrypoint.sh"]
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --proxy-headers"]
+# Bind to :: (IPv6, dual-stack — also serves IPv4 on Linux). Required for Railway
+# private networking, which is IPv6-only; harmless for the IPv4 compose stack.
+CMD ["sh", "-c", "uvicorn app.main:app --host :: --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --proxy-headers"]
