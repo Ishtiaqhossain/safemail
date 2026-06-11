@@ -19,6 +19,9 @@ FROM nginx:1.27-alpine
 # overrides PORT (the port it routes to) and API_UPSTREAM (the API's address).
 ENV API_UPSTREAM=api:8000
 ENV PORT=80
+# Tells the base image to populate NGINX_LOCAL_RESOLVERS from /etc/resolv.conf,
+# which the nginx config uses to re-resolve the API upstream at request time.
+ENV NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80

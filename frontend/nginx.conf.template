@@ -10,6 +10,12 @@ server {
     root   /usr/share/nginx/html;
     index  index.html;
 
+    # Re-resolve upstreams at request time using the container's own DNS
+    # (NGINX_LOCAL_RESOLVERS is populated from /etc/resolv.conf by the base
+    # image). Without this, nginx caches the backend's IP at startup and breaks
+    # whenever the backend redeploys to a new address.
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=10s;
+
     # SPA: fall back to index.html so client-side routes resolve.
     location / {
         try_files $uri $uri/ /index.html;
@@ -17,8 +23,11 @@ server {
 
     # Same-origin API proxy. Keeps the frontend and API on one origin so the
     # SameSite=Strict refresh cookie is sent and no CORS is needed in prod.
+    # Using a variable in proxy_pass forces per-request DNS resolution via the
+    # resolver above (instead of a one-time lookup at startup).
     location /v1/ {
-        proxy_pass         http://${API_UPSTREAM};
+        set                $upstream ${API_UPSTREAM};
+        proxy_pass         http://$upstream;
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
