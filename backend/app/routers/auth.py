@@ -21,7 +21,9 @@ from app.auth import (
     create_email_verification_token,
     decode_token, get_current_parent,
 )
-from app.services.crypto import encrypt_token
+from app.services.crypto import encrypt_token, decrypt_token
+from app.services.gmail import revoke_token
+from app.models.allowed_email import AllowedEmail
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, ForgotPasswordRequest, ResetPasswordRequest
 from app.ratelimit import (
     limiter, LOGIN_LIMIT, REGISTER_LIMIT, REFRESH_LIMIT,
@@ -302,6 +304,52 @@ async def disconnect_gmail(
         raise HTTPException(status_code=404, detail="Connection not found")
     await db.delete(conn)
     await db.commit()
+
+
+@router.delete("/account", status_code=204)
+async def delete_account(
+    response: Response,
+    current_parent: Annotated[Parent, Depends(get_current_parent)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Permanently erase a parent and all associated data.
+
+    Order matters: revoke Google OAuth grants first (while tokens still exist in
+    the DB), then delete the parent. The parents -> children -> {connections,
+    alerts, preferences, weekly_stats} FK cascade wipes every child record.
+    Finally drop the parent's invite-allowlist entry so their email is fully
+    erased. No raw email bodies are stored, so nothing else persists.
+    """
+    from sqlalchemy import func, delete as sa_delete
+
+    # 1. Revoke every Gmail grant at Google so we stop holding access after
+    #    deletion. Best-effort — a failed revoke must not block local erasure.
+    conns = await db.execute(
+        select(GmailConnection)
+        .join(Child, Child.id == GmailConnection.child_id)
+        .where(Child.parent_id == current_parent.id)
+    )
+    for conn in conns.scalars().all():
+        try:
+            revoke_token(decrypt_token(conn.refresh_token))
+        except Exception:
+            pass
+
+    # 2. Drop the invite-allowlist row matching this parent's email
+    #    (case-insensitive, mirroring how the allowlist is checked elsewhere).
+    await db.execute(
+        sa_delete(AllowedEmail).where(func.lower(AllowedEmail.email) == current_parent.email.strip().lower())
+    )
+
+    # 3. Delete the parent. A Core DELETE lets Postgres' ON DELETE CASCADE wipe
+    #    children -> {connections, alerts, preferences, weekly_stats} in one shot;
+    #    we avoid ORM relationship cascade here because lazy-loading the relations
+    #    isn't possible under the async session.
+    await db.execute(sa_delete(Parent).where(Parent.id == current_parent.id))
+    await db.commit()
+
+    # 4. Invalidate the session.
+    response.delete_cookie("refresh_token")
 
 
 def _set_refresh_cookie(response: Response, token: str) -> None:

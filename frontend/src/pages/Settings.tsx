@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { childrenApi } from "@/api/children";
 import { alertsApi } from "@/api/alerts";
+import { authApi } from "@/api/auth";
+import { clearAccessToken } from "@/api/client";
 import type { Child, AlertPreference, Severity, Category } from "@/types";
 
 const SEVERITIES: { value: Severity; label: string; color: string; bg: string }[] = [
@@ -50,6 +53,8 @@ export default function Settings() {
   const [addLoading, setAddLoading] = useState(false);
   const [prefs, setPrefs] = useState<Record<string, AlertPreference>>({});
   const [savedPrefId, setSavedPrefId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const navigate = useNavigate();
 
   const load = () => childrenApi.list().then(setChildren);
 
@@ -85,6 +90,24 @@ export default function Settings() {
     if (!confirm("Delete this child and all their data?")) return;
     await childrenApi.delete(id);
     load();
+  };
+
+  const deleteAccount = async () => {
+    const confirmed = window.prompt(
+      "This permanently deletes your account and ALL data — every child, " +
+      "Gmail connection, and alert. This cannot be undone.\n\n" +
+      'Type DELETE to confirm.'
+    );
+    if (confirmed !== "DELETE") return;
+    setDeleting(true);
+    try {
+      await authApi.deleteAccount();
+      clearAccessToken();
+      navigate("/login");
+    } catch {
+      setDeleting(false);
+      alert("Something went wrong deleting your account. Please try again.");
+    }
   };
 
   const savePref = async (childId: string, pref: AlertPreference) => {
@@ -328,6 +351,23 @@ export default function Settings() {
           })}
         </div>
       )}
+
+      {/* Danger zone */}
+      <div style={{ marginTop: 36, background: "#fff", border: "1px solid #fecaca", borderRadius: 12, padding: "22px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+        <h2 style={{ marginBottom: 4, fontSize: 15, color: "#dc2626" }}>Delete account</h2>
+        <p style={{ color: "#64748b", fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
+          Permanently delete your account and all associated data — every child,
+          Gmail connection, and alert. We also revoke SafeMail's access to any
+          connected Gmail accounts. This cannot be undone.
+        </p>
+        <button
+          onClick={deleteAccount}
+          disabled={deleting}
+          style={{ padding: "8px 18px", background: "#dc2626", color: "#fff", borderRadius: 7, fontWeight: 600, fontSize: 13, opacity: deleting ? 0.6 : 1 }}
+        >
+          {deleting ? "Deleting…" : "Delete my account"}
+        </button>
+      </div>
     </div>
   );
 }

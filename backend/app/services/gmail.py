@@ -1,6 +1,7 @@
 import base64
 from datetime import datetime, timezone, timedelta
 
+import httpx
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
@@ -10,6 +11,28 @@ from app.config import get_settings
 settings = get_settings()
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+
+GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke"
+
+
+def revoke_token(token: str) -> bool:
+    """Revoke a Google OAuth grant. Passing a refresh token revokes the whole
+    grant (and its access tokens). Best-effort: returns True on success, False
+    on any failure so callers can proceed with local deletion regardless.
+
+    Google returns 200 on success and 400 for an already-invalid/expired token —
+    both mean the grant no longer works, so we treat 400 as success too.
+    """
+    try:
+        resp = httpx.post(
+            GOOGLE_REVOKE_URL,
+            data={"token": token},
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=10.0,
+        )
+        return resp.status_code in (200, 400)
+    except Exception:
+        return False
 
 
 def build_gmail_service(access_token: str, refresh_token: str):
