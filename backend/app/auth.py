@@ -21,12 +21,22 @@ _private_key: str | None = None
 _public_key: str | None = None
 
 
+def _pem_from_env(value: str) -> str:
+    # Some env stores (docker-compose env-files, single-line PaaS vars) can't hold
+    # real newlines, so accept a PEM with literal "\n" escapes and restore them.
+    return value.replace("\\n", "\n") if "\\n" in value else value
+
+
 def _load_keys() -> None:
+    # Prefer PEM contents supplied directly via env (host-agnostic — no secret-file
+    # mount needed); fall back to the file paths for local development.
     global _private_key, _public_key
     if _private_key is None:
-        _private_key = Path(settings.jwt_private_key_path).read_text()
+        _private_key = _pem_from_env(settings.jwt_private_key) if settings.jwt_private_key \
+            else Path(settings.jwt_private_key_path).read_text()
     if _public_key is None:
-        _public_key = Path(settings.jwt_public_key_path).read_text()
+        _public_key = _pem_from_env(settings.jwt_public_key) if settings.jwt_public_key \
+            else Path(settings.jwt_public_key_path).read_text()
 
 
 def hash_password(password: str) -> str:

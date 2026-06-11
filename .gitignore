@@ -10,7 +10,14 @@ dist/
 
 # Env
 .env
+.env.production
+.env.*.local
+!.env.example
+!.env.production.example
 *.pem
+
+# Claude Code worktrees
+.claude/worktrees/
 
 # Node
 node_modules/

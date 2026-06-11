@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
-import { setAccessToken, setIsAdmin, setIsDeveloper, setIsEmailVerified, setOnboardingCompleted } from "@/api/client";
+import { setAccessToken, setIsAdmin, setIsDeveloper, setIsEmailVerified, setOnboardingCompleted, API_BASE } from "@/api/client";
 
 export default function Login({ onLogin }: { onLogin?: () => void }) {
   const navigate = useNavigate();
@@ -19,7 +19,7 @@ export default function Login({ onLogin }: { onLogin?: () => void }) {
     setError("");
     setLoading(true);
     try {
-      const endpoint = mode === "login" ? "/v1/auth/login" : "/v1/auth/register";
+      const endpoint = mode === "login" ? `${API_BASE}/v1/auth/login` : `${API_BASE}/v1/auth/register`;
       const body = mode === "login" ? { email, password } : { email, password, full_name: fullName };
       const { data } = await axios.post(endpoint, body, { withCredentials: true });
       setAccessToken(data.access_token);

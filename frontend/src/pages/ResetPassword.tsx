@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { API_BASE } from "@/api/client";
 
 export default function ResetPassword() {
   const [params] = useSearchParams();
@@ -41,7 +42,7 @@ export default function ResetPassword() {
     if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
     setError(""); setLoading(true);
     try {
-      await axios.post("/v1/auth/reset-password", { token, new_password: password });
+      await axios.post(`${API_BASE}/v1/auth/reset-password`, { token, new_password: password });
       navigate("/login?reset=true");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail

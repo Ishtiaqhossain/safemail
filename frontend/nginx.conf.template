@@ -1,0 +1,25 @@
+# Served by nginx in the frontend container. The nginx:alpine image runs
+# envsubst over this file at startup, substituting ${API_UPSTREAM} (an env var)
+# while leaving nginx's own $-variables untouched (they aren't in the env).
+server {
+    listen       80;
+    server_name  _;
+
+    root   /usr/share/nginx/html;
+    index  index.html;
+
+    # SPA: fall back to index.html so client-side routes resolve.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Same-origin API proxy. Keeps the frontend and API on one origin so the
+    # SameSite=Strict refresh cookie is sent and no CORS is needed in prod.
+    location /v1/ {
+        proxy_pass         http://${API_UPSTREAM};
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+}

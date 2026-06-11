@@ -1,5 +1,5 @@
 from functools import lru_cache
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,6 +9,11 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/safemail"
     redis_url: str = "redis://localhost:6379/0"
 
+    # JWT keys. In production set the PEM *contents* via these env vars (works on
+    # any host without a "secret files" feature); locally we fall back to the
+    # file paths below. See app/auth.py::_load_keys.
+    jwt_private_key: str = ""
+    jwt_public_key: str = ""
     jwt_private_key_path: str = "./keys/private.pem"
     jwt_public_key_path: str = "./keys/public.pem"
     jwt_algorithm: str = "RS256"
@@ -43,6 +48,17 @@ class Settings(BaseSettings):
     # Invite-only alpha: only allowlisted emails may register / log in.
     # Set False to open registration for public launch.
     invite_only_enabled: bool = True
+
+    @field_validator("database_url")
+    @classmethod
+    def _normalize_db_url(cls, v: str) -> str:
+        # Managed hosts hand out `postgres://` / `postgresql://`; the app needs the
+        # asyncpg driver. Normalize here so any host's connection string works
+        # unchanged (the sync engine in database.py derives its URL from this).
+        for prefix in ("postgresql+asyncpg://", "postgresql://", "postgres://"):
+            if v.startswith(prefix):
+                return "postgresql+asyncpg://" + v[len(prefix):]
+        return v
 
     _REQUIRED_IN_PROD = ("fernet_key", "google_client_secret", "anthropic_api_key", "sendgrid_api_key")
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
+import { API_BASE } from "@/api/client";
 
 export default function VerifyEmail() {
   const [params] = useSearchParams();
@@ -9,7 +10,7 @@ export default function VerifyEmail() {
 
   useEffect(() => {
     if (!token) { setStatus("error"); return; }
-    axios.get(`/v1/auth/verify-email?token=${encodeURIComponent(token)}`, { maxRedirects: 0 })
+    axios.get(`${API_BASE}/v1/auth/verify-email?token=${encodeURIComponent(token)}`, { maxRedirects: 0 })
       .then(() => setStatus("success"))
       .catch((err) => {
         // The endpoint redirects to the dashboard on success; axios may follow the redirect.

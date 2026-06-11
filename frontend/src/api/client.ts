@@ -1,6 +1,12 @@
 import axios from "axios";
 
-const api = axios.create({ baseURL: "/v1", withCredentials: true });
+// Base origin for the API. Defaults to "" so requests are relative ("/v1/...") —
+// in production the frontend's nginx proxies /v1 to the API (same-origin, so the
+// refresh cookie works with no CORS), and in dev Vite proxies it. Set
+// VITE_API_BASE_URL at build time only when pointing at a separate API origin.
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+
+const api = axios.create({ baseURL: `${API_BASE}/v1`, withCredentials: true });
 
 let accessToken: string | null = null;
 let adminFlag = false;
@@ -35,7 +41,7 @@ export function isAuthenticated() {
 
 export async function tryRefresh(): Promise<boolean> {
   try {
-    const { data } = await axios.post("/v1/auth/refresh", {}, { withCredentials: true });
+    const { data } = await axios.post(`${API_BASE}/v1/auth/refresh`, {}, { withCredentials: true });
     setAccessToken(data.access_token);
     setIsAdmin(data.is_admin ?? false);
     setIsDeveloper(data.is_developer ?? false);
@@ -60,7 +66,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !error.config._retry) {
       error.config._retry = true;
       try {
-        const { data } = await axios.post("/v1/auth/refresh", {}, { withCredentials: true });
+        const { data } = await axios.post(`${API_BASE}/v1/auth/refresh`, {}, { withCredentials: true });
         setAccessToken(data.access_token);
         error.config.headers.Authorization = `Bearer ${data.access_token}`;
         return api(error.config);
