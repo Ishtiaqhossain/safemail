@@ -1,0 +1,129 @@
+/* Scoped styles for the public landing page (src/pages/Landing.tsx).
+   Everything is namespaced under .lp-* so it cannot leak into the app shell.
+   Inline styles handle the look; this file exists only for what inline styles
+   cannot express: media queries (responsiveness) and :hover. */
+
+.lp-root {
+  background: #fff;
+  color: #0f172a;
+  width: 100%;
+}
+
+/* ---- Layout helpers ---- */
+.lp-container {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.lp-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+.lp-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+.lp-grid-6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+
+/* ---- Sticky nav ---- */
+.lp-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: saturate(180%) blur(10px);
+  border-bottom: 1px solid #e2e8f0;
+}
+.lp-nav-links { display: flex; align-items: center; gap: 26px; }
+.lp-nav-link { color: #475569; font-size: 14px; font-weight: 500; }
+.lp-nav-link:hover { color: #0f172a; text-decoration: none; }
+
+/* ---- Buttons ---- */
+.lp-btn-primary {
+  background: #2563eb;
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+  border-radius: 8px;
+  padding: 12px 20px;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.lp-btn-primary:hover { background: #1d4ed8; }
+
+.lp-btn-ghost {
+  background: transparent;
+  color: #334155;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 8px;
+  padding: 9px 14px;
+}
+.lp-btn-ghost:hover { background: #f1f5f9; }
+
+/* ---- Cards ---- */
+.lp-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 24px;
+  transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+}
+.lp-card-hover:hover {
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  transform: translateY(-2px);
+  border-color: #cbd5e1;
+}
+
+/* ---- FAQ ---- */
+.lp-faq details {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 18px 4px;
+}
+.lp-faq summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 16px;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.lp-faq summary::-webkit-details-marker { display: none; }
+.lp-faq summary::after {
+  content: "+";
+  color: #94a3b8;
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 1;
+}
+.lp-faq details[open] summary::after { content: "\2013"; } /* en dash */
+.lp-faq p { color: #64748b; margin-top: 12px; line-height: 1.6; }
+
+/* ---- Email capture ---- */
+.lp-capture {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 440px;
+}
+.lp-capture input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  font-size: 15px;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 860px) {
+  .lp-grid-2 { grid-template-columns: 1fr; gap: 36px; }
+  .lp-grid-3 { grid-template-columns: 1fr; gap: 20px; }
+  .lp-grid-6 { grid-template-columns: 1fr 1fr; }
+  .lp-nav-links .lp-nav-link { display: none; }   /* hide anchor links, keep CTAs */
+  .lp-hero-h1 { font-size: 38px !important; }
+}
+
+@media (max-width: 520px) {
+  .lp-container { padding: 0 18px; }
+  .lp-grid-6 { grid-template-columns: 1fr; }
+  .lp-capture { flex-direction: column; }
+  .lp-capture .lp-btn-primary { width: 100%; }
+  .lp-hero-h1 { font-size: 32px !important; }
+}
