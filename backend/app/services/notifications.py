@@ -1,3 +1,4 @@
+import html
 import json
 from app.config import get_settings
 
@@ -18,18 +19,28 @@ def send_alert_email(parent_email: str, child_name: str, alert: dict) -> None:
     from sendgrid import SendGridAPIClient
     from sendgrid.helpers.mail import Mail
 
-    severity = SEVERITY_LABELS.get(alert["severity"], alert["severity"].upper())
-    category = CATEGORY_LABELS.get(alert["category"], alert["category"])
+    severity = SEVERITY_LABELS.get(alert["severity"], str(alert["severity"]).upper())
+    category = CATEGORY_LABELS.get(alert["category"], str(alert["category"]))
 
-    html = f"""
+    # Escape every dynamic value before interpolating into HTML. The summary and
+    # response script are model-generated from attacker-controlled email text, so
+    # without escaping a crafted email could inject links/markup into the alert
+    # email — the most trusted channel the product has.
+    summary = html.escape(alert.get("ai_summary") or "")
+    script = html.escape(alert.get("ai_response_script") or "Review the email in your child's Gmail account.")
+    safe_child = html.escape(child_name)
+    safe_severity = html.escape(severity)
+    safe_category = html.escape(category)
+
+    html_body = f"""
 <h2>SafeMail Safety Alert</h2>
-<p><strong>Severity:</strong> {severity}<br>
-<strong>Category:</strong> {category}<br>
-<strong>Child:</strong> {child_name}</p>
+<p><strong>Severity:</strong> {safe_severity}<br>
+<strong>Category:</strong> {safe_category}<br>
+<strong>Child:</strong> {safe_child}</p>
 <h3>What we found</h3>
-<p>{alert["ai_summary"]}</p>
+<p>{summary}</p>
 <h3>Suggested next step</h3>
-<p>{alert.get("ai_response_script") or "Review the email in your child's Gmail account."}</p>
+<p>{script}</p>
 <p><em>We do not include the original email in this alert to protect your child's privacy.</em></p>
 """
 
@@ -37,7 +48,7 @@ def send_alert_email(parent_email: str, child_name: str, alert: dict) -> None:
         from_email=settings.email_from,
         to_emails=parent_email,
         subject=f"[SafeMail] {severity} Alert — {child_name}'s Email",
-        html_content=html,
+        html_content=html_body,
     )
     SendGridAPIClient(settings.sendgrid_api_key).send(message)
 
@@ -98,11 +109,14 @@ def send_reconnect_email(to_email: str, child_name: str, gmail_address: str, rec
     from sendgrid import SendGridAPIClient
     from sendgrid.helpers.mail import Mail
 
-    html = f"""
+    safe_child = html.escape(child_name)
+    safe_gmail = html.escape(gmail_address)
+
+    html_body = f"""
 <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-  <h2 style="color:#0f172a">Action needed: reconnect {child_name}'s Gmail</h2>
-  <p>SafeMail has lost access to <strong>{gmail_address}</strong>, so we are no
-     longer monitoring {child_name}'s email. This usually happens when the Google
+  <h2 style="color:#0f172a">Action needed: reconnect {safe_child}'s Gmail</h2>
+  <p>SafeMail has lost access to <strong>{safe_gmail}</strong>, so we are no
+     longer monitoring {safe_child}'s email. This usually happens when the Google
      permission is revoked or expires.</p>
   <p style="color:#b91c1c;font-weight:600">Until you reconnect, no safety alerts will be sent for this account.</p>
   <p style="margin:24px 0">
@@ -118,7 +132,7 @@ def send_reconnect_email(to_email: str, child_name: str, gmail_address: str, rec
         from_email=settings.email_from,
         to_emails=to_email,
         subject=f"[SafeMail] Reconnect needed — {child_name}'s email is no longer monitored",
-        html_content=html,
+        html_content=html_body,
     )
     SendGridAPIClient(settings.sendgrid_api_key).send(message)
 
