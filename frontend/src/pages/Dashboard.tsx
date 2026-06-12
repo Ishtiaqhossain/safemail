@@ -30,6 +30,19 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string 
   );
 }
 
+function relativeTime(iso: string | null): string {
+  if (!iso) return "not yet";
+  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 0) return "just now";
+  if (secs < 60) return "just now";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr${hrs === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
 function ConnectionStatus({ status }: { status: "active" | "revoked" | "error" }) {
   const map: Record<string, { color: string; bg: string; label: string }> = {
     active:  { color: "#16a34a", bg: "#f0fdf4", label: "Active" },
@@ -196,6 +209,11 @@ export default function Dashboard() {
                         <ConnectionStatus status={conn.status} />
                       </div>
                       <p style={{ fontSize: 12, color: "#374151", wordBreak: "break-all" }}>{conn.gmail_address}</p>
+                      {conn.status === "active" && (
+                        <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 5 }}>
+                          🕑 Last checked {relativeTime(conn.last_synced_at)}
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <button
