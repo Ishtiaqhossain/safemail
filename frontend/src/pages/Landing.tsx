@@ -3,6 +3,11 @@ import { Link } from "react-router-dom";
 import { joinWaitlist } from "@/api/waitlist";
 import "./landing.css";
 
+// Deep-link into the register form with the email pre-filled (Login.tsx reads
+// these query params).
+const registerHref = (email: string) =>
+  `/login?mode=register&email=${encodeURIComponent(email)}`;
+
 /* ------------------------------------------------------------------ */
 /*  Content — edit copy here. Kept as module-level data so it's easy    */
 /*  to find and change without hunting through JSX.                     */
@@ -81,7 +86,7 @@ const FAQS = [
 
 function EmailCaptureCTA({ buttonLabel = "Request an invite" }: { buttonLabel?: string }) {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "submitting" | "done" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "submitting" | "done" | "invited" | "error">("idle");
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,12 +94,33 @@ function EmailCaptureCTA({ buttonLabel = "Request an invite" }: { buttonLabel?: 
     if (!trimmed) return;
     setStatus("submitting");
     try {
-      await joinWaitlist(trimmed);
-      setStatus("done");
+      const result = await joinWaitlist(trimmed);
+      // Already on the allowlist → they can register now, don't make them wait.
+      setStatus(result === "already_invited" ? "invited" : "done");
     } catch {
       setStatus("error");
     }
   };
+
+  if (status === "invited") {
+    return (
+      <div
+        role="status"
+        style={{
+          display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, maxWidth: 440,
+          background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1e40af",
+          borderRadius: 10, padding: "13px 16px", fontSize: 15, fontWeight: 500,
+        }}
+      >
+        <span style={{ fontSize: 18 }}>🎉</span>
+        <span>You're already invited — </span>
+        <Link to={registerHref(email.trim())} style={{ color: "#1d4ed8", fontWeight: 700 }}>
+          create your account
+        </Link>
+        <span>.</span>
+      </div>
+    );
+  }
 
   if (status === "done") {
     return (

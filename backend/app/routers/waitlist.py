@@ -5,6 +5,11 @@ SafeMail is invite-only. Being on the waitlist grants no access — an admin
 promotes an entry to the allowlist (app.routers.admin) before that person can
 register. The endpoint is intentionally idempotent and always reports success
 so it can't be used to enumerate who has already signed up.
+
+If the email is *already* on the allowlist, the person can register right now,
+so we skip the waitlist entirely and return ``status: "already_invited"`` —
+the landing page uses this to send them to the register form instead of
+showing the "we'll email you a spot" wait message.
 """
 from typing import Annotated
 
@@ -17,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.ratelimit import limiter, WAITLIST_LIMIT
 from app.models.waitlist_entry import WaitlistEntry
-from app.services.allowlist import normalize_email
+from app.services.allowlist import normalize_email, is_email_allowed
 
 router = APIRouter(prefix="/waitlist", tags=["waitlist"])
 
@@ -35,6 +40,11 @@ async def join_waitlist(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     email = normalize_email(body.email)
+
+    # Already invited? They can create an account now — don't park them on the
+    # waitlist. Tell the client to route them to registration instead.
+    if await is_email_allowed(db, email):
+        return {"status": "already_invited"}
 
     existing = (await db.execute(
         select(WaitlistEntry.id).where(func.lower(WaitlistEntry.email) == email)
