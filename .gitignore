@@ -33,3 +33,11 @@ alembic/versions/*.pyc
 
 # Claude Code
 .claude/settings.local.json
+
+# Personal drafts (not part of the product)
+docs/LINKEDIN-DRAFT.md
+docs/LINKEDIN-POST.md
+
+# Explainer video + helper scripts (not part of the published product)
+video/
+backend/scripts/
