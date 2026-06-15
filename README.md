@@ -4,6 +4,12 @@
 
 SafeMail connects to a child's Gmail account, scans incoming emails with Claude AI, and alerts a parent only when something genuinely dangerous shows up — self-harm, grooming, bullying, drugs, stranger contact, or sharing of personal information. Everyday email stays private.
 
+## Demo
+
+[![Watch the SafeMail demo](docs/media/safemail_demo_poster.png)](docs/media/safemail_demo.mp4)
+
+> A 27-second tour of the product — click to play.
+
 ## Why SafeMail
 
 - **Privacy first.** Raw email text is never stored. Only an AI-generated summary and a few pieces of metadata are kept — never the original message.
