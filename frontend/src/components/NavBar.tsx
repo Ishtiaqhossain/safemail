@@ -91,7 +91,7 @@ export function NavBar() {
             onClick={logout}
             style={{ background: "none", border: "1px solid #e2e8f0", color: "#64748b", padding: "5px 14px", borderRadius: 6, fontSize: 13 }}
           >
-            Log out
+            Sign out
           </button>
         </div>
       </div>

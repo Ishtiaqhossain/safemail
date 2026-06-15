@@ -8,10 +8,10 @@ SEVERITY_LABELS = {"critical": "CRITICAL", "high": "HIGH", "medium": "MEDIUM", "
 CATEGORY_LABELS = {
     "self_harm": "Self-Harm",
     "grooming": "Grooming",
-    "bullying": "Bullying / Harassment",
-    "drugs_alcohol": "Drugs / Alcohol",
+    "bullying": "Bullying",
+    "drugs_alcohol": "Drugs & Alcohol",
     "stranger_contact": "Stranger Contact",
-    "personal_info_sharing": "Personal Information Sharing",
+    "personal_info_sharing": "Personal Info",
 }
 
 

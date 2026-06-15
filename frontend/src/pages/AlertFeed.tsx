@@ -10,7 +10,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   self_harm: "Self-Harm",
   grooming: "Grooming",
   bullying: "Bullying",
-  drugs_alcohol: "Drugs / Alcohol",
+  drugs_alcohol: "Drugs & Alcohol",
   stranger_contact: "Stranger Contact",
   personal_info_sharing: "Personal Info",
 };
@@ -153,7 +153,7 @@ export default function AlertFeed() {
                         onClick={() => markReviewed(alert.id)}
                         style={{ fontSize: 12, color: "#64748b", background: "#f1f5f9", border: "none", padding: "4px 10px", borderRadius: 5, cursor: "pointer" }}
                       >
-                        Mark read
+                        Mark reviewed
                       </button>
                     )}
                   </td>

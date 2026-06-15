@@ -193,7 +193,7 @@ export default function Settings() {
                 <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#eff6ff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
-                      👦
+                      🧒
                     </div>
                     <div>
                       <p style={{ fontWeight: 600, fontSize: 15, color: "#0f172a" }}>{child.display_name}</p>
@@ -341,7 +341,7 @@ export default function Settings() {
                     {/* Digest frequency */}
                     <div>
                       <p style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
-                        Weekly digest
+                        Email digest
                       </p>
                       <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
                         <span style={{ color: "#64748b" }}>Send me a digest email</span>

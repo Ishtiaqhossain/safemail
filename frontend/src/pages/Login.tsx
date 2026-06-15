@@ -109,7 +109,7 @@ export default function Login({ onLogin }: { onLogin?: () => void }) {
                 transition: "all 0.15s",
               }}
             >
-              {m === "login" ? "Sign in" : "Register"}
+              {m === "login" ? "Sign in" : "Sign up"}
             </button>
           ))}
         </div>
@@ -183,13 +183,15 @@ export default function Login({ onLogin }: { onLogin?: () => void }) {
               marginTop: 4,
             }}
           >
-            {loading ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
+            {loading
+              ? mode === "login" ? "Signing in…" : "Creating account…"
+              : mode === "login" ? "Sign in" : "Create account"}
           </button>
         </form>
       </div>
 
       <p style={{ marginTop: 20, fontSize: 12, color: "#94a3b8" }}>
-        Email monitoring for families.
+        Email safety for families.
       </p>
     </div>
   );

@@ -11,7 +11,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   self_harm: "Self-Harm",
   grooming: "Grooming",
   bullying: "Bullying",
-  drugs_alcohol: "Drugs / Alcohol",
+  drugs_alcohol: "Drugs & Alcohol",
   stranger_contact: "Stranger Contact",
   personal_info_sharing: "Personal Info",
 };
@@ -158,7 +158,7 @@ export default function Dashboard() {
       {/* Page header */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ marginBottom: 4 }}>Dashboard</h1>
-        <p style={{ color: "#64748b", fontSize: 14 }}>Overview of your children's email activity.</p>
+        <p style={{ color: "#64748b", fontSize: 14 }}>An overview of your family's email safety.</p>
       </div>
 
       {/* Stat bar */}
@@ -200,7 +200,7 @@ export default function Dashboard() {
                         <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 1 }}>Born {child.birth_year}</p>
                       )}
                     </div>
-                    <span style={{ fontSize: 20 }}>👦</span>
+                    <span style={{ fontSize: 20 }}>🧒</span>
                   </div>
                   {conn ? (
                     <div style={{ background: "#f8fafc", borderRadius: 7, padding: "8px 10px" }}>

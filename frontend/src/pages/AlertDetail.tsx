@@ -29,10 +29,10 @@ const SEVERITY_LABEL: Record<Severity, string> = {
 const CATEGORY_LABEL: Record<string, string> = {
   self_harm:            "Self-Harm",
   grooming:             "Grooming",
-  bullying:             "Bullying / Harassment",
-  drugs_alcohol:        "Drugs / Alcohol",
+  bullying:             "Bullying",
+  drugs_alcohol:        "Drugs & Alcohol",
   stranger_contact:     "Stranger Contact",
-  personal_info_sharing:"Personal Info Sharing",
+  personal_info_sharing:"Personal Info",
 };
 
 const CATEGORY_ICON: Record<string, string> = {
