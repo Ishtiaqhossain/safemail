@@ -32,6 +32,10 @@ https://github.com/user-attachments/assets/b4278d0a-53a5-49cd-ae16-234d33b5112e
 
 SafeMail watches for: **self-harm · grooming · bullying · drugs · stranger contact · personal-information sharing.**
 
+## Accuracy
+
+Every change to the classifier is held to a labeled evaluation suite — **≥85% recall and under 15% false positives**. See the **[benchmark report](https://ishtiaqhossain.github.io/safemail-benchmark/)** for the latest numbers and the trade-offs behind them.
+
 ## Developers
 
 Setup, architecture, testing, and deployment details live in the **[Development Guide](docs/DEVELOPMENT.md)**.
