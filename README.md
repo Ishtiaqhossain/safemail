@@ -6,9 +6,7 @@ SafeMail connects to a child's Gmail account, scans incoming emails with Claude 
 
 ## Demo
 
-[![Watch the SafeMail demo](docs/media/safemail_demo_poster.png)](docs/media/safemail_demo.mp4)
-
-> A 27-second tour of the product — click to play.
+https://github.com/user-attachments/assets/b4278d0a-53a5-49cd-ae16-234d33b5112e
 
 ## Why SafeMail
 
