@@ -2,7 +2,11 @@
 
 ## What this project is
 
-SafeMail is an AI-powered email monitoring service for parents. It connects to a child's Gmail account, scans emails with Claude AI, and sends parents a smart alert only when something genuinely dangerous is detected (self-harm, grooming, bullying, drugs, stranger contact, personal info sharing). Raw email body text is never stored — only the AI-generated summary and metadata.
+SafeMail is an AI-powered email monitoring service for parents. It connects to a child's Gmail account, scans emails with Claude AI, and sends parents a smart alert only when something genuinely dangerous is detected. Raw email body text is never stored — only the AI-generated summary and metadata.
+
+The six detection categories (enum values used throughout the code): `self_harm`, `grooming`, `bullying`, `drugs_alcohol`, `stranger_contact`, `personal_info_sharing`.
+
+Access is **invite-only** (`INVITE_ONLY_ENABLED`): a public landing page captures a waitlist, and allowlisted emails can register directly. There's also a parent **admin** console and a **developer** console (LLM cost/usage stats).
 
 ## Repo structure
 
@@ -14,18 +18,22 @@ safemail/
 │   │   ├── config.py         Settings (pydantic-settings, reads .env)
 │   │   ├── database.py       SQLAlchemy async engine (FastAPI) + sync engine (Celery)
 │   │   ├── auth.py           JWT helpers, bcrypt, get_current_parent dependency
-│   │   ├── models/           SQLAlchemy ORM models (Parent, Child, GmailConnection, Alert, ...)
+│   │   ├── models/           SQLAlchemy ORM — Parent, Child, GmailConnection, Alert, AlertPreference,
+│   │   │                       AllowedEmail, WaitlistEntry, TaskLog, WeeklyStats
 │   │   ├── schemas/          Pydantic request/response models
-│   │   ├── routers/          FastAPI routers — auth, children, alerts, preferences, stats
-│   │   ├── services/         Business logic — gmail.py, analysis.py, notifications.py, crypto.py
-│   │   ├── tasks/            Celery tasks — ingestion.py, analysis.py, digest.py
+│   │   ├── routers/          FastAPI routers — auth, children, alerts, preferences, stats,
+│   │   │                       onboarding, waitlist, admin, developer
+│   │   ├── services/         Business logic — gmail, analysis, notifications, crypto,
+│   │   │                       allowlist, token_denylist
+│   │   ├── tasks/            Celery tasks — ingestion.py, analysis.py, digest.py, utils.py
+│   │   ├── ratelimit.py      Auth-endpoint rate limiting (active when DEBUG=false)
 │   │   └── worker.py         Celery app + beat schedule
 │   ├── alembic/              DB migrations
 │   ├── tests/
 │   │   ├── conftest.py       Async test DB + client fixtures
 │   │   ├── test_auth.py      Auth endpoint tests
 │   │   ├── test_alerts.py    Alert endpoint tests
-│   │   └── evaluation/       AI classifier effectiveness tests (46 fixtures)
+│   │   └── evaluation/       AI classifier effectiveness tests (41 fixtures)
 │   ├── keys/                 JWT RSA keypair (gitignored)
 │   ├── .env                  Local secrets (gitignored)
 │   ├── .env.example          Template
@@ -33,14 +41,18 @@ safemail/
 │   └── requirements.txt
 ├── frontend/                 React 18 + TypeScript + Vite
 │   └── src/
-│       ├── api/              Axios API clients (alerts.ts, children.ts, client.ts)
+│       ├── api/              Axios API clients — client, auth, alerts, children,
+│       │                       onboarding, waitlist, admin, developer
 │       ├── components/       AlertBadge, NavBar
-│       ├── pages/            Login, Dashboard, AlertFeed, AlertDetail, Settings
+│       ├── pages/            Landing, Login, Onboarding, VerifyEmail, ForgotPassword,
+│       │                       ResetPassword, Dashboard, AlertFeed, AlertDetail,
+│       │                       Settings, Admin, Developer
 │       └── types/            Shared TypeScript types
 ├── docker-compose.yml        Local dev: Postgres + Redis + API + worker + beat
 ├── docker-compose.prod.yml   Production stack (adds frontend; no bind mounts/reload)
 ├── .env.production.example   Production env contract
 ├── docs/
+│   ├── DEVELOPMENT.md         Dev setup, env vars, tests, deploy (developer-facing)
 │   └── DEPLOY-railway.md      Step-by-step Railway deploy guide
 ├── PRD_email_monitoring.md   Product requirements
 └── TECH_SPEC_email_monitoring.md  Technical specification
@@ -132,13 +144,23 @@ Quality gates: ≥ 85% recall, ≤ 15% false positive rate.
 | `FCM_SERVICE_ACCOUNT_JSON` | Firebase push notifications (optional) |
 | `DEBUG` | `true` locally (enables `/docs`, relaxes validation); **`false` in production** |
 | `COOKIE_SECURE` | `true` in production (HTTPS-only refresh cookie) |
-| `RUN_MIGRATIONS` | Set `true` on the API container only — its entrypoint runs `alembic upgrade head` |
+| `FRONTEND_URL` | Base URL used to build links in transactional email (default `http://localhost:3000`) |
+| `CONFIDENCE_THRESHOLD` | Min classifier confidence to alert (default `0.70`); below this is dropped |
+| `MAX_BODY_LENGTH` | Email body truncation before analysis (default `8000`) |
+| `ALERT_POLL_INTERVAL_MINUTES` | Gmail poll cadence (default `5`) |
+| `CASCADE_ENABLED` | Gate the multi-model cost-saving cascade (default `false`) |
+| `RATE_LIMIT_ENABLED` | Toggle auth rate limiting (default `true`) |
+| `INVITE_ONLY_ENABLED` | Require allowlist/waitlist to register (default `true`) |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` / `REFRESH_TOKEN_EXPIRE_DAYS` | JWT lifetimes (default `15` / `30`) |
+| `RUN_MIGRATIONS` | Set `true` on the API container only — its entrypoint runs `alembic upgrade head` (handled at the entrypoint, not in `config.py`) |
 
 ## Architecture decisions
 
 - **Raw email body is never persisted.** It lives in memory and the Redis queue only. Only the AI summary, category, severity, and metadata are written to the DB.
 - **Celery uses a sync SQLAlchemy engine.** FastAPI uses async (asyncpg). Both point at the same Postgres DB. Don't mix sessions between the two.
 - **Confidence threshold is 0.70.** Emails classified below this are silently dropped. Tune via `CONFIDENCE_THRESHOLD` in config.
+- **AI cost resilience (in `app/services/analysis.py`).** Prompt caching on the system prompt, retry with error discrimination, and an optional multi-model cascade gated behind `CASCADE_ENABLED` (default off — a cheaper model screens, escalating to a stronger one only when needed). Parent feedback on alerts feeds back into reporting (`WeeklyStats`, developer console).
+- **Invite-only access (`INVITE_ONLY_ENABLED`, default on).** Non-allowlisted signups land on a waitlist; allowlisted emails (`AllowedEmail`) register directly. See `app/services/allowlist.py` and the `waitlist`/`onboarding` routers.
 - **Gmail polling is every 5 minutes.** Redis dedup set (7-day TTL) prevents the same message being analyzed twice.
 - **OAuth tokens are Fernet-encrypted** before writing to the DB. Never log or return them in API responses.
 - **JWT uses RS256** (asymmetric). Private key signs, public key verifies. Locally from `backend/keys/`; in production from the `JWT_PRIVATE_KEY`/`JWT_PUBLIC_KEY` env vars (no secret-file mount required).

@@ -1,158 +1,37 @@
 # SafeMail
 
-AI-powered email monitoring for parents. Connects to a child's Gmail account, scans incoming emails with Claude AI, and sends an alert only when genuinely dangerous content is detected — self-harm, grooming, bullying, drugs, stranger contact, or personal information sharing.
+**AI-powered email monitoring that gives parents peace of mind — without reading their child's mail.**
 
-**Raw email body text is never stored.** Only the AI-generated summary, category, severity, and metadata are written to the database.
+SafeMail connects to a child's Gmail account, scans incoming emails with Claude AI, and alerts a parent only when something genuinely dangerous shows up — self-harm, grooming, bullying, drugs, stranger contact, or sharing of personal information. Everyday email stays private.
 
-## Features
+## Why SafeMail
 
-- Gmail OAuth integration — connect a child's account in seconds
-- Claude AI classification with a 0.70 confidence threshold
-- Smart alerts: parents only hear about real risks, not noise
-- Push notifications (FCM) and email digests (SendGrid)
-- Dashboard with alert feed, severity badges, and per-child settings
+- **Privacy first.** Raw email text is never stored. Only an AI-generated summary and a few pieces of metadata are kept — never the original message.
+- **Signal, not noise.** You don't get a notification for every email. SafeMail only speaks up when it's confident something is actually a risk.
+- **Built for busy parents.** Connect an account in seconds, then forget about it until it matters.
 
-## Tech Stack
+## How it works
 
-| Layer | Technology |
-|---|---|
-| Backend | Python 3.12 · FastAPI · SQLAlchemy · Alembic |
-| Workers | Celery · Redis |
-| Database | PostgreSQL |
-| AI | Anthropic Claude API |
-| Frontend | React 18 · TypeScript · Vite |
-| Auth | JWT RS256 · bcrypt |
-| Encryption | Fernet (OAuth tokens at rest) |
-| Notifications | SendGrid · Firebase FCM |
+1. **Connect** — Link your child's Gmail account with a few taps (secure Google sign-in).
+2. **Monitor** — SafeMail quietly checks for new email in the background.
+3. **Understand** — Each message is read by Claude AI to judge whether it's harmful.
+4. **Alert** — If a real risk is found, you get a notification and a plain-language summary of what happened and why it matters.
 
-## Quick Start
+## What you get
 
-### Prerequisites
+- A simple dashboard showing each connected child and recent alerts
+- Clear severity badges so you know what needs attention now vs. later
+- Push notifications and email digests, on your schedule
+- Per-child settings to tune what you want to hear about
 
-```bash
-python3.12 --version
-node --version      # 20+
-docker --version
-```
+## Detection categories
 
-### First-time setup
+SafeMail watches for: **self-harm · grooming · bullying · drugs · stranger contact · personal-information sharing.**
 
-```bash
-cd backend
-python3.12 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+## Developers
 
-# Generate JWT keypair
-mkdir -p keys
-openssl genrsa -out keys/private.pem 2048
-openssl rsa -in keys/private.pem -pubout -out keys/public.pem
+Setup, architecture, testing, and deployment details live in the **[Development Guide](docs/DEVELOPMENT.md)**.
 
-# Generate Fernet encryption key — copy output to .env as FERNET_KEY
-python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+## License
 
-cp .env.example .env   # fill in all values
-```
-
-### Run locally (4 terminals)
-
-```bash
-# 1. Databases
-docker compose up postgres redis
-
-# 2. API  →  http://localhost:8000  (Swagger: /docs)
-cd backend && source .venv/bin/activate
-alembic upgrade head
-uvicorn app.main:app --reload
-
-# 3. Celery worker (polls Gmail every 5 min, runs AI, sends alerts)
-cd backend && source .venv/bin/activate
-celery -A app.worker worker -l info
-
-# 4. Frontend  →  http://localhost:3000
-cd frontend && npm install && npm run dev
-```
-
-Or start everything at once:
-
-```bash
-docker compose up
-```
-
-## Deployment
-
-The whole stack is packaged as portable Docker images configured purely through environment variables, so it runs on any Docker host or managed PaaS.
-
-```bash
-# Full production stack on any Docker host (VPS, etc.)
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
-```
-
-This brings up six services — Postgres, Redis, the API, a Celery worker, Celery beat, and the frontend (nginx serving the SPA and reverse-proxying `/v1` to the API, same-origin). The API container applies migrations on start (`RUN_MIGRATIONS=true`).
-
-- **Managed PaaS (Railway):** step-by-step guide in [`docs/DEPLOY-railway.md`](docs/DEPLOY-railway.md). Thin per-service manifests live in `backend/railway.json` and `frontend/railway.json`.
-- **Config contract:** every required production variable is listed in `.env.production.example`.
-- Production hardening (all on by default when `DEBUG=false`): rate limiting on auth endpoints, refresh-token revocation, security headers, password-strength rules, generic 500s with server-side logging, and fail-fast validation of required secrets.
-
-## Environment Variables
-
-| Variable | Description |
-|---|---|
-| `DATABASE_URL` | PostgreSQL connection. Any scheme (`postgres://`, `postgresql://`, `postgresql+asyncpg://`) is auto-normalized to asyncpg. |
-| `REDIS_URL` | Redis connection |
-| `FERNET_KEY` | AES encryption key for OAuth tokens |
-| `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` | RSA key **contents** (PEM, `\n`-escaped OK). Used in production instead of files — no secret-file mount needed. |
-| `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | Paths to the RSA keypair (local-dev fallback when the above aren't set) |
-| `GOOGLE_CLIENT_ID` | Google OAuth app client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth app client secret |
-| `GOOGLE_REDIRECT_URI` | Must match Google Console exactly |
-| `ANTHROPIC_API_KEY` | Claude API key for email classification |
-| `SENDGRID_API_KEY` | For alert and digest emails |
-| `EMAIL_FROM` | From-address for transactional email — must be a verified SendGrid sender |
-| `FCM_SERVICE_ACCOUNT_JSON` | Firebase push notifications (optional) |
-| `DEBUG` | `true` locally (enables `/docs`, relaxes secret validation). **Must be `false` in production.** |
-| `COOKIE_SECURE` | `true` in production so the refresh cookie is HTTPS-only |
-
-See `.env.example` (local) and `.env.production.example` (production contract) for full templates.
-
-## Running Tests
-
-```bash
-cd backend && source .venv/bin/activate
-
-# Unit + pipeline tests (~5s, no API key needed)
-pytest tests/evaluation/test_pipeline.py -v
-
-# Auth + API tests (requires test database)
-pytest tests/test_auth.py tests/test_alerts.py -v
-
-# Full AI accuracy suite (calls real Claude API, ~$0.20, ~2 min)
-pytest tests/evaluation/test_classifier.py -v -s
-
-# Precision/recall report only
-pytest tests/evaluation/test_classifier.py::test_precision_recall_report -v -s
-```
-
-Quality gates: ≥ 85% recall · ≤ 15% false positive rate.
-
-## Architecture Notes
-
-- **No raw email storage.** Email bodies live in memory and the Redis queue only; only the AI summary and metadata reach Postgres.
-- **Celery uses a sync SQLAlchemy engine.** FastAPI uses async (asyncpg). Both point at the same database — don't mix sessions between the two.
-- **Gmail polling every 5 minutes.** A Redis dedup set (7-day TTL) prevents the same message being analyzed twice.
-- **JWT uses RS256** (asymmetric). Private key signs, public key verifies. Both live in `backend/keys/` (gitignored).
-
-## DB Migrations
-
-```bash
-# After changing a model
-alembic revision --autogenerate -m "description"
-alembic upgrade head
-
-# Roll back one step
-alembic downgrade -1
-```
-
-## API
-
-Base URL: `http://localhost:8000/v1`  
-Swagger UI: `http://localhost:8000/docs`
+MIT — see [LICENSE](LICENSE).
