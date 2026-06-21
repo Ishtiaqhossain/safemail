@@ -14,6 +14,7 @@ import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import VerifyEmail from "@/pages/VerifyEmail";
 import Onboarding from "@/pages/Onboarding";
+import { PrivacyPage, TermsPage } from "@/pages/Legal";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -88,6 +89,8 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
         <Route path="/onboarding" element={<OnboardingRoute authStatus={authStatus}><Onboarding /></OnboardingRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute authStatus={authStatus}><Dashboard /></ProtectedRoute>} />
         <Route path="/alerts" element={<ProtectedRoute authStatus={authStatus}><AlertFeed /></ProtectedRoute>} />

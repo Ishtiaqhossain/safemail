@@ -468,8 +468,8 @@ function Footer() {
           <a className="lp-nav-link" href="#privacy">Privacy</a>
           <a className="lp-nav-link" href="#faq">FAQ</a>
           <Link className="lp-nav-link" to="/login">Sign in</Link>
-          <a className="lp-nav-link" href="#">Privacy Policy</a>
-          <a className="lp-nav-link" href="#">Terms</a>
+          <Link className="lp-nav-link" to="/privacy">Privacy Policy</Link>
+          <Link className="lp-nav-link" to="/terms">Terms</Link>
         </div>
       </div>
       <div className="lp-container" style={{ marginTop: 28, color: "#94a3b8", fontSize: 12.5 }}>
