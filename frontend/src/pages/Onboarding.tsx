@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { childrenApi } from "@/api/children";
 import { onboardingApi } from "@/api/onboarding";
 import { setOnboardingCompleted } from "@/api/client";
+import { track } from "@/analytics";
 
 const STEP_LABELS = ["Welcome", "How it works", "Consent", "Add child", "Connect Gmail", "Done"];
 export const LS_KEY = "sm_onboarding";
@@ -46,7 +47,13 @@ export default function Onboarding() {
     localStorage.setItem(LS_KEY, JSON.stringify({ step, childId }));
   }, [step, childId]);
 
+  // Track which wizard step the user is on — reveals where they drop off.
+  useEffect(() => {
+    track("onboarding_step_viewed", { step, label: STEP_LABELS[step] });
+  }, [step]);
+
   const finishLater = async () => {
+    track("gmail_connect_skipped", { step });
     setBusy(true);
     try { await onboardingApi.complete(); } catch { /* non-blocking */ }
     setOnboardingCompleted(true);
@@ -78,6 +85,7 @@ export default function Onboarding() {
 
   const connectGmail = async () => {
     if (!childId) { setStep(3); return; }
+    track("gmail_connect_initiated", {});
     setBusy(true); setError(null);
     try {
       await childrenApi.connectGmail(childId, "/onboarding?connected=true");

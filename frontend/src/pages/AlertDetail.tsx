@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { alertsApi } from "@/api/alerts";
 import type { Alert, Severity } from "@/types";
+import { track } from "@/analytics";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -107,6 +108,7 @@ export default function AlertDetail() {
       if (found) {
         setAlert(found);
         setFeedback(found.parent_feedback);
+        track("alert_viewed", { severity: found.severity, category: found.category });
         if (!found.reviewed_at) alertsApi.markReviewed(found.id);
       }
     });

@@ -68,6 +68,7 @@ jobs:
         run: >-
           pytest -v
           tests/test_monitoring.py
+          tests/test_analytics.py
           tests/test_auth.py
           tests/test_alerts.py
           tests/evaluation/test_pipeline.py

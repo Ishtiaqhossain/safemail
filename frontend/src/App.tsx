@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { initAnalytics, pageview } from "@/analytics";
 import { NavBar } from "@/components/NavBar";
 import Login from "@/pages/Login";
 import Landing from "@/pages/Landing";
@@ -18,6 +19,15 @@ import Onboarding from "@/pages/Onboarding";
 import { PrivacyPage, TermsPage } from "@/pages/Legal";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
+
+// Fires a page_viewed event on every route change (anonymous, first-party).
+function RouteAnalytics() {
+  const location = useLocation();
+  useEffect(() => {
+    pageview(location.pathname);
+  }, [location.pathname]);
+  return null;
+}
 
 function ProtectedRoute({ authStatus, children }: { authStatus: AuthStatus; children: React.ReactNode }) {
   if (authStatus === "loading") return <p style={{ padding: 24 }}>Loading...</p>;
@@ -75,6 +85,7 @@ export default function App() {
   );
 
   useEffect(() => {
+    initAnalytics();
     if (authStatus === "loading") {
       tryRefresh().then((ok) => setAuthStatus(ok ? "authenticated" : "unauthenticated"));
     }
@@ -84,6 +95,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <RouteAnalytics />
       <Routes>
         <Route path="/" element={<PublicRoute authStatus={authStatus}><Landing /></PublicRoute>} />
         <Route path="/login" element={<Login onLogin={handleLogin} />} />

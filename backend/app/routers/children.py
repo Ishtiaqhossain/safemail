@@ -11,6 +11,7 @@ from app.auth import get_current_parent
 from app.models.parent import Parent
 from app.models.child import Child
 from app.schemas.children import ChildCreate, ChildUpdate, ChildResponse
+from app.services.analytics_events import record_event_async
 
 router = APIRouter(prefix="/children", tags=["children"])
 
@@ -38,6 +39,7 @@ async def create_child(
     child = Child(parent_id=current_parent.id, display_name=body.display_name, birth_year=body.birth_year)
     db.add(child)
     await db.commit()
+    await record_event_async(db, "child_added", parent_id=current_parent.id)
     result = await db.execute(
         select(Child).where(Child.id == child.id).options(selectinload(Child.gmail_connections))
     )

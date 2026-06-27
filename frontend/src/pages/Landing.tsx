@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { joinWaitlist } from "@/api/waitlist";
+import { track } from "@/analytics";
 import "./landing.css";
 
 // Deep-link into the register form with the email pre-filled (Login.tsx reads
@@ -92,6 +93,7 @@ function EmailCaptureCTA({ buttonLabel = "Request an invite" }: { buttonLabel?: 
     e.preventDefault();
     const trimmed = email.trim();
     if (!trimmed) return;
+    track("landing_cta_clicked", { cta: "waitlist" });
     setStatus("submitting");
     try {
       const result = await joinWaitlist(trimmed);

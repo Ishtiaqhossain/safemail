@@ -13,6 +13,7 @@ from app.models.parent import Parent
 from app.models.child import Child
 from app.models.alert import Alert
 from app.schemas.alerts import AlertResponse, AlertListResponse, AlertListMeta, AlertUpdateRequest, AlertFeedbackRequest
+from app.services.analytics_events import record_event_async
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -93,6 +94,8 @@ async def submit_feedback(
     alert = await _get_owned_alert(db, alert_id, current_parent.id, is_developer=current_parent.is_developer)
     alert.parent_feedback = body.feedback
     await db.commit()
+    await record_event_async(db, "alert_feedback_given", parent_id=current_parent.id,
+                             properties={"value": body.feedback})
     return {"detail": "Feedback recorded"}
 
 
