@@ -137,6 +137,68 @@ def send_reconnect_email(to_email: str, child_name: str, gmail_address: str, rec
     SendGridAPIClient(settings.sendgrid_api_key).send(message)
 
 
+SYSTEM_SEVERITY_LABELS = {"critical": "CRITICAL", "warning": "WARNING", "info": "INFO"}
+
+
+def send_health_alert(to_emails, incident: dict, *, resolved: bool = False) -> None:
+    """Email operators about a system-health incident (or its resolution).
+
+    ``to_emails`` is a single address or a list. ``incident`` is a plain dict built
+    from a HealthIncident row: title, severity, detail, check_name, diagnosis,
+    remediation_status, and a remediation dict. All dynamic values are HTML-escaped
+    — the diagnosis is model-generated, so treat it as untrusted (OWASP LLM05).
+    """
+    from sendgrid import SendGridAPIClient
+    from sendgrid.helpers.mail import Mail
+
+    severity = SYSTEM_SEVERITY_LABELS.get(incident.get("severity"), str(incident.get("severity", "")).upper())
+    title = html.escape(incident.get("title") or "System health incident")
+    detail = html.escape(incident.get("detail") or "")
+    diagnosis = html.escape(incident.get("diagnosis") or "")
+    rem_status = html.escape(str(incident.get("remediation_status") or "none"))
+
+    actions = (incident.get("remediation") or {}).get("actions") or []
+    actions_html = ""
+    if actions:
+        items = "".join(
+            f"<li>{html.escape(a.get('tool', ''))}: {html.escape(json.dumps(a.get('result', {})))}</li>"
+            for a in actions
+        )
+        actions_html = f"<h3>Automated actions taken</h3><ul>{items}</ul>"
+
+    monitoring_url = f"{settings.frontend_url}/monitoring"
+    heading = "Resolved" if resolved else f"{severity} system alert"
+    color = "#16a34a" if resolved else ("#b91c1c" if severity == "CRITICAL" else "#b45309")
+
+    diagnosis_html = f"<h3>Agent diagnosis</h3><p>{diagnosis}</p>" if diagnosis else ""
+
+    html_body = f"""
+<div style="font-family:sans-serif;max-width:560px;margin:0 auto">
+  <h2 style="color:{color}">SafeMail — {html.escape(heading)}</h2>
+  <p><strong>{title}</strong></p>
+  <p>{detail}</p>
+  {diagnosis_html}
+  <p><strong>Remediation status:</strong> {rem_status}</p>
+  {actions_html}
+  <p style="margin:24px 0">
+    <a href="{monitoring_url}"
+       style="background:#2563eb;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-weight:600">
+      Open the monitoring console
+    </a>
+  </p>
+  <p style="color:#64748b;font-size:13px">This is an automated message from SafeMail's self-monitoring system.</p>
+</div>"""
+
+    subject_prefix = "[SafeMail] Resolved" if resolved else f"[SafeMail] {severity}"
+    message = Mail(
+        from_email=settings.email_from,
+        to_emails=to_emails,
+        subject=f"{subject_prefix} — {incident.get('title') or 'system health'}",
+        html_content=html_body,
+    )
+    SendGridAPIClient(settings.sendgrid_api_key).send(message)
+
+
 def send_push_notification(fcm_token: str, child_name: str, alert: dict) -> None:
     if not settings.fcm_service_account_json or not fcm_token:
         return

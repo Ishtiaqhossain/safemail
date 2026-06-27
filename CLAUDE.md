@@ -151,6 +151,10 @@ Quality gates: ≥ 85% recall, ≤ 15% false positive rate.
 | `CASCADE_ENABLED` | Gate the multi-model cost-saving cascade (default `false`) |
 | `RATE_LIMIT_ENABLED` | Toggle auth rate limiting (default `true`) |
 | `INVITE_ONLY_ENABLED` | Require allowlist/waitlist to register (default `true`) |
+| `MONITORING_ENABLED` | Gate the scheduled self-monitoring cycle (default `true`) |
+| `MONITORING_INTERVAL_MINUTES` | Health-probe cadence (default `10`) |
+| `AUTO_REMEDIATION_ENABLED` | Let the remediation agent take bounded fix actions; off = diagnose-and-recommend only (default `false`) |
+| `OPS_ALERT_EMAIL` | Destination for system-health alerts; falls back to all admin parents if unset |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` / `REFRESH_TOKEN_EXPIRE_DAYS` | JWT lifetimes (default `15` / `30`) |
 | `RUN_MIGRATIONS` | Set `true` on the API container only — its entrypoint runs `alembic upgrade head` (handled at the entrypoint, not in `config.py`) |
 
@@ -164,6 +168,7 @@ Quality gates: ≥ 85% recall, ≤ 15% false positive rate.
 - **Gmail polling is every 5 minutes.** Redis dedup set (7-day TTL) prevents the same message being analyzed twice.
 - **OAuth tokens are Fernet-encrypted** before writing to the DB. Never log or return them in API responses.
 - **JWT uses RS256** (asymmetric). Private key signs, public key verifies. Locally from `backend/keys/`; in production from the `JWT_PRIVATE_KEY`/`JWT_PUBLIC_KEY` env vars (no secret-file mount required).
+- **Agentic self-monitoring (`MONITORING_ENABLED`, default on).** A Celery beat task (`app/tasks/monitoring.py::run_monitoring_cycle`, every `MONITORING_INTERVAL_MINUTES`) runs health probes (`app/services/monitoring.py`: Redis, Celery queue backlog, Gmail-poll liveness/staleness, task failure rate, terminal Claude API errors, connections in error). A new problem opens a `HealthIncident` (deduped by `fingerprint`), is handed to an LLM remediation agent (`app/services/remediation.py` — a Claude tool-use loop with read-only investigation tools plus an allowlist of bounded, idempotent fix actions gated behind `AUTO_REMEDIATION_ENABLED`), and emails ops (`send_health_alert`). Re-trips bump `times_seen`; incidents auto-resolve when their probe stops firing. Admin-only console at `/monitoring` (router `app/routers/monitoring.py`, page `frontend/src/pages/Monitoring.tsx`).
 - **Production hardening (active when `DEBUG=false`).** Rate limiting on auth endpoints (`app/ratelimit.py`), refresh-token revocation via a Redis denylist (`app/services/token_denylist.py`), security-headers middleware + tight CORS, password-strength validation, generic 500 bodies (full traceback logged server-side), `/docs` disabled, and startup validation that required secrets are set.
 
 ## Deployment

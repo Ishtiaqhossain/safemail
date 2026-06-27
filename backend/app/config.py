@@ -59,6 +59,32 @@ class Settings(BaseSettings):
     # Set False to open registration for public launch.
     invite_only_enabled: bool = True
 
+    # ── Agentic self-monitoring ────────────────────────────────────────────────
+    # A scheduled Celery task runs health probes over the system (DB, Redis, the
+    # Celery queue, Gmail polling freshness, AI failure rate). When a probe trips,
+    # it opens a HealthIncident, emails ops, and hands the finding to an
+    # LLM remediation agent (app/services/remediation.py).
+    monitoring_enabled: bool = True
+    monitoring_interval_minutes: int = 10
+
+    # The remediation agent may call read-only investigation tools always; it may
+    # call bounded *fix* actions (re-enqueue polling, reset a stuck connection)
+    # only when this is on. Off by default — the agent diagnoses and recommends
+    # but does not act until an operator opts in.
+    auto_remediation_enabled: bool = False
+
+    # Where system-health alerts are sent. Falls back to every Parent.is_admin
+    # address when unset, so a fresh deploy still reaches someone.
+    ops_alert_email: str = ""
+
+    # Probe thresholds. Tuned conservatively so a single transient blip doesn't
+    # page; sustained problems do.
+    health_stale_connection_minutes: int = 30   # active conn not synced in this long
+    health_failure_window_minutes: int = 30      # window for the failure-rate probe
+    health_max_failure_rate: float = 0.30        # task failure ratio that trips a warning
+    health_min_failures_to_alert: int = 3        # don't trip on 1/1 failures in a quiet window
+    health_queue_depth_warn: int = 200           # Celery backlog that trips a warning
+
     @field_validator("database_url")
     @classmethod
     def _normalize_db_url(cls, v: str) -> str:

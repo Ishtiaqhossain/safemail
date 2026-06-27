@@ -10,6 +10,7 @@ import Settings from "@/pages/Settings";
 import { isAuthenticated, tryRefresh, getIsAdmin, getIsDeveloper, getOnboardingCompleted } from "@/api/client";
 import Admin from "@/pages/Admin";
 import Developer from "@/pages/Developer";
+import Monitoring from "@/pages/Monitoring";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import VerifyEmail from "@/pages/VerifyEmail";
@@ -97,6 +98,7 @@ export default function App() {
         <Route path="/alerts/:id" element={<ProtectedRoute authStatus={authStatus}><AlertDetail /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute authStatus={authStatus}><Settings /></ProtectedRoute>} />
         <Route path="/admin" element={<AdminRoute authStatus={authStatus}><Admin /></AdminRoute>} />
+        <Route path="/monitoring" element={<AdminRoute authStatus={authStatus}><Monitoring /></AdminRoute>} />
         <Route path="/developer" element={<DeveloperRoute authStatus={authStatus}><Developer /></DeveloperRoute>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

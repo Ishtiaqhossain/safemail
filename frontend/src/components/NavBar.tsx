@@ -62,6 +62,19 @@ export function NavBar() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {getIsAdmin() && (
             <Link
+              to="/monitoring"
+              style={{
+                fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 99,
+                background: isActive("/monitoring") ? "#dcfce7" : "#f1f5f9",
+                color: isActive("/monitoring") ? "#15803d" : "#64748b",
+                textDecoration: "none",
+              }}
+            >
+              Health
+            </Link>
+          )}
+          {getIsAdmin() && (
+            <Link
               to="/admin"
               style={{
                 fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 99,
