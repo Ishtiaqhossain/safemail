@@ -1,0 +1,51 @@
+name: Classifier accuracy eval
+
+# Paid: this calls the real Claude API (~$0.20/run) and enforces the quality
+# gate (>= 85% recall, <= 15% false-positive rate). Kept off the PR path so PRs
+# stay fast and free. Run it manually from the Actions tab when you change the
+# prompt, the cascade, or the fixtures. Requires an ANTHROPIC_API_KEY repo secret
+# (Settings -> Secrets and variables -> Actions).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  classifier:
+    name: Classifier eval (real API)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DEBUG: "true"
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      JWT_PRIVATE_KEY_PATH: ./keys/private.pem
+      JWT_PUBLIC_KEY_PATH: ./keys/public.pem
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fail early if the API key secret is missing
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::ANTHROPIC_API_KEY repo secret is not set — add it under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate JWT keypair + Fernet key
+        run: |
+          mkdir -p keys
+          openssl genrsa -out keys/private.pem 2048
+          openssl rsa -in keys/private.pem -pubout -out keys/public.pem
+          echo "FERNET_KEY=$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')" >> "$GITHUB_ENV"
+
+      - name: Run classifier accuracy suite
+        run: pytest tests/evaluation/test_classifier.py -v -s
