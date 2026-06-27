@@ -8,7 +8,7 @@ celery = Celery(
     "safemail",
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["app.tasks.ingestion", "app.tasks.analysis", "app.tasks.digest"],
+    include=["app.tasks.ingestion", "app.tasks.analysis", "app.tasks.digest", "app.tasks.monitoring"],
 )
 
 celery.conf.update(
@@ -33,5 +33,9 @@ celery.conf.beat_schedule = {
     "cleanup-old-alerts": {
         "task": "app.tasks.digest.cleanup_old_data",
         "schedule": crontab(hour=2, minute=0),
+    },
+    "run-monitoring-cycle": {
+        "task": "app.tasks.monitoring.run_monitoring_cycle",
+        "schedule": crontab(minute=f"*/{settings.monitoring_interval_minutes}"),
     },
 }

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafeMail — Agentic Self-Monitoring</title>
+<style>
+  :root {
+    --blue: #2563eb; --blue-dark: #1d4ed8; --ink: #0f172a; --slate: #475569;
+    --muted: #64748b; --line: #e2e8f0; --bg: #f8fafc; --card: #fff;
+    --crit: #b91c1c; --warn: #b45309; --ok: #16a34a; --violet: #7c3aed;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6; font-size: 16px;
+  }
+  .shell { max-width: 1180px; margin: 0 auto; padding: 0 24px; display: flex; gap: 40px; }
+  nav.toc {
+    position: sticky; top: 0; align-self: flex-start; height: 100vh; overflow-y: auto;
+    width: 220px; flex-shrink: 0; padding: 32px 0; font-size: 14px;
+  }
+  nav.toc a { display: block; color: var(--muted); text-decoration: none; padding: 4px 0; }
+  nav.toc a:hover { color: var(--blue); }
+  nav.toc .brand { font-weight: 700; font-size: 16px; color: var(--ink); margin-bottom: 16px; display:flex; gap:8px; align-items:center;}
+  main { flex: 1; min-width: 0; padding: 48px 0 96px; }
+  h1 { font-size: 34px; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .sub { color: var(--muted); font-size: 18px; margin: 0 0 32px; }
+  h2 { font-size: 24px; letter-spacing: -0.01em; margin: 48px 0 12px; padding-top: 12px; }
+  h3 { font-size: 17px; margin: 28px 0 8px; }
+  p { color: var(--slate); }
+  code { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13.5px;
+    background: #eef2f7; padding: 1.5px 6px; border-radius: 5px; color: #0b3a8a; }
+  pre { background: var(--ink); color: #e2e8f0; padding: 16px 18px; border-radius: 10px;
+    overflow-x: auto; font-size: 13px; line-height: 1.55; }
+  pre code { background: none; color: inherit; padding: 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; }
+  .grid { display: grid; gap: 14px; }
+  .grid.two { grid-template-columns: 1fr 1fr; }
+  .grid.three { grid-template-columns: repeat(3, 1fr); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  td code { font-size: 12.5px; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 99px;
+    text-transform: uppercase; letter-spacing: .03em; }
+  .pill.crit { background:#fee2e2; color: var(--crit); }
+  .pill.warn { background:#ffedd5; color: var(--warn); }
+  .pill.ok   { background:#dcfce7; color: var(--ok); }
+  .pill.blue { background:#dbeafe; color: var(--blue-dark); }
+  .pill.violet { background:#ede9fe; color: var(--violet); }
+  .callout { border-left: 4px solid var(--blue); background:#eff6ff; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+  .callout.warn { border-color: var(--warn); background:#fff7ed; }
+  .callout.safe { border-color: var(--ok); background:#f0fdf4; }
+  .callout strong { color: var(--ink); }
+  .muted { color: var(--muted); }
+  .lead { font-size: 17px; }
+  /* flow diagram */
+  .flow { display: flex; flex-direction: column; gap: 0; margin: 20px 0; }
+  .flow-row { display: flex; align-items: stretch; gap: 14px; flex-wrap: wrap; }
+  .node { flex: 1; min-width: 150px; background: var(--card); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 16px; }
+  .node .t { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+  .node .d { font-size: 12.5px; color: var(--muted); }
+  .node.accent { border-color: var(--blue); box-shadow: 0 0 0 3px #2563eb1a; }
+  .arrow { text-align: center; color: var(--muted); font-size: 22px; line-height: 1; margin: 6px 0; }
+  .step { display:flex; gap:14px; margin: 14px 0; }
+  .step .n { flex-shrink:0; width:30px; height:30px; border-radius:99px; background:var(--blue); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; }
+  .step .body { flex:1; }
+  .step .body h4 { margin: 3px 0 4px; font-size: 15px; }
+  .step .body p { margin: 0; font-size: 14px; }
+  .files { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .files code { font-size: 12px; }
+  .tag { font-size:11px; color:var(--muted); border:1px solid var(--line); border-radius:6px; padding:1px 7px; }
+  hr { border: none; border-top: 1px solid var(--line); margin: 40px 0; }
+  @media (max-width: 860px) { nav.toc { display:none; } .grid.two, .grid.three { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="toc">
+    <div class="brand">🛡️ SafeMail</div>
+    <a href="#overview">Overview</a>
+    <a href="#bigpicture">The big picture</a>
+    <a href="#detect">1 · Detection (probes)</a>
+    <a href="#incident">2 · Incidents</a>
+    <a href="#agent">3 · The agent</a>
+    <a href="#tools">Agent toolset</a>
+    <a href="#loop">The agent loop</a>
+    <a href="#safety">Safety model</a>
+    <a href="#alert">4 · Alert &amp; resolve</a>
+    <a href="#config">Configuration</a>
+    <a href="#observe">Observing it</a>
+    <a href="#files">File map</a>
+  </nav>
+
+  <main>
+    <h1>Agentic Self-Monitoring</h1>
+    <p class="sub">How SafeMail watches its own health, and how an LLM agent diagnoses and fixes problems.</p>
+
+    <section id="overview">
+      <p class="lead">SafeMail runs a background loop that probes its own health, and when something
+      breaks it hands the problem to a <strong>Claude agent</strong>. The agent investigates with a
+      constrained set of tools, takes a safe automated fix when one applies, and otherwise escalates to a
+      human — leaving a full audit trail behind. It does three things:</p>
+      <div class="grid three">
+        <div class="card"><span class="pill warn">detect</span><p style="margin:10px 0 0">Health probes catch broken polling, AI failures, queue backlogs, dead Redis, and revoked Gmail grants.</p></div>
+        <div class="card"><span class="pill blue">alert</span><p style="margin:10px 0 0">A new problem opens an incident and emails ops, with the agent's diagnosis attached.</p></div>
+        <div class="card"><span class="pill ok">fix</span><p style="margin:10px 0 0">The agent attempts bounded, reversible fixes — gated off by default until you trust it.</p></div>
+      </div>
+    </section>
+
+    <h2 id="bigpicture">The big picture</h2>
+    <p>A Celery beat task fires on a schedule (every <code>MONITORING_INTERVAL_MINUTES</code>, default 10).
+    Each cycle runs every probe, reconciles findings against the open-incident table, and — only for a
+    <em>new</em> problem — invokes the agent and sends an alert.</p>
+
+    <div class="flow">
+      <div class="flow-row">
+        <div class="node"><div class="t">⏱ Celery beat</div><div class="d">run_monitoring_cycle, every N min</div></div>
+        <div class="node"><div class="t">🔍 Probes</div><div class="d">DB · Redis · queue · polling · AI errors</div></div>
+        <div class="node"><div class="t">🗂 Incidents</div><div class="d">dedup by fingerprint</div></div>
+      </div>
+      <div class="arrow">↓ &nbsp; new problem only</div>
+      <div class="flow-row">
+        <div class="node accent"><div class="t">🤖 Remediation agent</div><div class="d">Claude tool-use loop: investigate → fix or escalate</div></div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="flow-row">
+        <div class="node"><div class="t">📧 Alert ops</div><div class="d">email with diagnosis + actions</div></div>
+        <div class="node"><div class="t">🛠 Fix action</div><div class="d">re-enqueue / nudge (gated)</div></div>
+        <div class="node"><div class="t">✅ Auto-resolve</div><div class="d">when the probe stops firing</div></div>
+      </div>
+    </div>
+
+    <hr>
+
+    <h2 id="detect">1 · Detection — the probes</h2>
+    <p>Each probe is a small, isolated function in <code>app/services/monitoring.py</code>. It inspects one
+    facet of the system and returns a <code>Finding</code> when something's wrong, or <code>None</code> when
+    healthy. A probe that raises is caught and skipped, so one broken check can't blind the others.</p>
+
+    <table>
+      <thead><tr><th>Probe</th><th>Fires when…</th><th>Severity</th></tr></thead>
+      <tbody>
+        <tr><td><code>check_redis</code></td><td>Redis PING fails (broker + dedup set are down)</td><td><span class="pill crit">critical</span></td></tr>
+        <tr><td><code>check_queue_backlog</code></td><td>Celery queue depth exceeds the threshold</td><td><span class="pill warn">warning</span></td></tr>
+        <tr><td><code>check_polling_liveness</code></td><td>Active connections exist but no poll ran in the liveness window (beat/worker likely down)</td><td><span class="pill crit">critical</span></td></tr>
+        <tr><td><code>check_stale_connections</code></td><td>Some active connections haven't synced recently while others have</td><td><span class="pill warn">warning</span></td></tr>
+        <tr><td><code>check_task_failure_rate</code></td><td>Sustained spike in <code>poll_connection</code> / <code>analyze_message</code> failures</td><td><span class="pill warn">warning</span></td></tr>
+        <tr><td><code>check_terminal_api_failures</code></td><td>Emails dropped on non-retryable 4xx from Claude (bad/expired API key)</td><td><span class="pill crit">critical</span></td></tr>
+        <tr><td><code>check_connections_in_error</code></td><td>Gmail grants revoked/expired — child unmonitored until parent reconnects</td><td><span class="pill warn">warning</span></td></tr>
+      </tbody>
+    </table>
+
+    <p>A <code>Finding</code> carries everything downstream needs — including a <code>remediation_hint</code>,
+    plain-language guidance written for the agent (not the end user):</p>
+<pre><code>@dataclass
+class Finding:
+    check_name: str
+    fingerprint: str        # stable dedup key, e.g. "polling_stalled"
+    severity: str           # "warning" | "critical"
+    title: str
+    detail: str
+    metrics: dict           # the numbers that tripped the probe
+    remediation_hint: str   # what this means + which fixes to consider</code></pre>
+
+    <h2 id="incident">2 · Incidents — dedup &amp; lifecycle</h2>
+    <p>Every distinct problem is one <code>HealthIncident</code> row, keyed by <code>fingerprint</code>. The
+    cycle reconciles current findings against open incidents:</p>
+    <div class="grid three">
+      <div class="card"><strong>New</strong><p style="margin:8px 0 0">No open incident with this fingerprint → create one, run the agent, alert.</p></div>
+      <div class="card"><strong>Recurring</strong><p style="margin:8px 0 0">Already open → bump <code>times_seen</code>, refresh metrics. <em>No</em> duplicate alert or re-run.</p></div>
+      <div class="card"><strong>Gone</strong><p style="margin:8px 0 0">Open incident whose probe no longer fires → auto-resolve; send an "all clear" if it was alerted.</p></div>
+    </div>
+    <p class="muted" style="margin-top:14px">This is what keeps a flapping problem from paging you every
+    10 minutes: one incident, one alert, a running <code>times_seen</code> counter, and a clean auto-resolve.</p>
+
+    <hr>
+
+    <h2 id="agent">3 · The agent — the core</h2>
+    <p>This is the "agentic" part: <code>app/services/remediation.py</code>. Given a <code>Finding</code>, it
+    runs a <strong>manual Claude tool-use loop</strong> — the model investigates with tools, decides on an
+    action, and reports back. It uses <code>claude-sonnet-4-6</code> (the model the product already uses for
+    its classifier), runs synchronously inside the Celery worker, and <strong>never raises</strong>: any
+    failure degrades to a recorded <code>failed</code> status so the incident still opens and alerts.</p>
+
+    <div class="callout">
+      <strong>Why a manual loop and not the SDK tool-runner?</strong> The harness needs to do three things
+      the auto-runner can't: <em>gate</em> mutating tools behind a config flag, <em>cap</em> how many fix
+      actions run, and <em>record</em> every action for the audit trail. So we drive the loop ourselves.
+    </div>
+
+    <h3 id="tools">The toolset</h3>
+    <p>The agent can only do what a tool lets it — there is no shell, no SQL, no arbitrary writes. Tools come
+    in three tiers:</p>
+
+    <div class="grid two">
+      <div class="card">
+        <span class="pill ok">always available · read-only</span>
+        <table style="margin-top:10px">
+          <tr><td><code>get_recent_task_logs</code></td><td>inspect failures &amp; error strings</td></tr>
+          <tr><td><code>get_connection_summary</code></td><td>counts by status + stale/errored lists</td></tr>
+          <tr><td><code>get_queue_depth</code></td><td>current Celery backlog</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <span class="pill warn">gated · mutating</span>
+        <p class="muted" style="font-size:13px;margin:8px 0 6px">Offered to the model <em>only</em> when <code>AUTO_REMEDIATION_ENABLED=true</code>.</p>
+        <table>
+          <tr><td><code>requeue_gmail_polling</code></td><td>re-enqueue a full poll cycle (idempotent)</td></tr>
+          <tr><td><code>poll_connection_now</code></td><td>nudge one active connection (idempotent)</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <span class="pill violet">always available</span>
+      <table style="margin-top:10px"><tr><td style="width:200px"><code>escalate</code></td><td>declare the incident needs a human, with a reason and recommended action</td></tr></table>
+    </div>
+
+    <p style="margin-top:16px">The fix tools are deliberately the only two operations that are both
+    <strong>idempotent</strong> (a Redis dedup set prevents reprocessing the same email) and
+    <strong>safe to repeat</strong>. Anything that genuinely can't be auto-fixed — a bad API key,
+    infrastructure down, a revoked OAuth grant only the parent can renew — has no fix tool, so the agent's
+    only move there is <code>escalate</code>.</p>
+
+    <h3 id="loop">The agent loop, step by step</h3>
+    <div class="step"><div class="n">1</div><div class="body"><h4>Assemble the prompt</h4><p>System prompt casts the model as SafeMail's on-call SRE. The user turn contains the finding (title, detail, metrics, the probe's hint) and whether fix tools are available.</p></div></div>
+    <div class="step"><div class="n">2</div><div class="body"><h4>Call Claude with the tool set</h4><p>Read tools + <code>escalate</code> always; the two fix tools only in auto mode. Each response's token usage is accumulated for cost reporting.</p></div></div>
+    <div class="step"><div class="n">3</div><div class="body"><h4>If it stopped to use tools, execute them</h4><p>Read tools query the live DB / Redis. Fix tools and <code>escalate</code> are recorded in the <code>actions</code> list. Results go back to the model as <code>tool_result</code> blocks, and the loop continues.</p></div></div>
+    <div class="step"><div class="n">4</div><div class="body"><h4>Repeat until it stops calling tools</h4><p>Bounded by <code>MAX_AGENT_TURNS = 8</code>. The model gathers what it needs, acts (or escalates), then ends its turn with a plain-text diagnosis.</p></div></div>
+    <div class="step"><div class="n">5</div><div class="body"><h4>Return a structured audit record</h4><p>Diagnosis, every action with its result, the run mode, turn count, and token cost — written back onto the incident row.</p></div></div>
+
+<pre><code># What remediate() returns and persists on the incident
+{
+  "mode": "auto" | "advisory",
+  "status": "attempted" | "escalated" | "diagnosed" | "failed",
+  "diagnosis": "Polling stalled because the worker wasn't draining...",
+  "actions": [ {"tool": "requeue_gmail_polling", "input": {}, "result": {...}} ],
+  "model": "claude-sonnet-4-6",
+  "turns": 3,
+  "input_tokens": 1840, "output_tokens": 210, "cost_usd": 0.0086
+}</code></pre>
+
+    <table>
+      <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pill ok">attempted</span></td><td>A fix action ran. The next cycle's probe confirms whether it actually resolved.</td></tr>
+        <tr><td><span class="pill violet">escalated</span></td><td>No safe fix applied — the agent flagged it for a human.</td></tr>
+        <tr><td><span class="pill blue">diagnosed</span></td><td>Advisory mode (or no action warranted): investigated and explained, took nothing.</td></tr>
+        <tr><td><span class="pill crit">failed</span></td><td>The agent itself errored (e.g. no API key). The incident still opens and alerts.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="safety">The safety model</h2>
+    <p>The guiding principle is in the system prompt: <em>a wrong automated action is worse than escalating.</em>
+    Several layers enforce it.</p>
+    <div class="callout safe">
+      <strong>Off by default.</strong> <code>AUTO_REMEDIATION_ENABLED=false</code> means the agent runs in
+      <em>advisory</em> mode — it investigates and recommends but is never even <em>offered</em> a mutating
+      tool. You opt into automated fixes only once you trust them.
+    </div>
+    <ul style="color:var(--slate)">
+      <li><strong>Allowlist, not capability.</strong> The agent can only call the tools it's given. No shell, no SQL, no free-form writes.</li>
+      <li><strong>Bounded.</strong> Hard caps on agent turns (<code>MAX_AGENT_TURNS = 8</code>) and on mutating actions per incident (<code>MAX_FIX_ACTIONS = 3</code>), enforced by the loop regardless of what the model asks for.</li>
+      <li><strong>Idempotent fixes only.</strong> The two fix tools are safe to repeat; the dedup set prevents double-processing email.</li>
+      <li><strong>Guardrails inside tools.</strong> <code>poll_connection_now</code> refuses to touch a connection in <code>error</code> state — that needs the parent to re-grant OAuth, not a retry.</li>
+      <li><strong>Fails safe.</strong> Any agent crash or API error is captured as <code>failed</code>; the cycle continues and the incident still alerts.</li>
+      <li><strong>Untrusted output.</strong> The model-written diagnosis is HTML-escaped before it goes in an email (treated as untrusted text, per the codebase's OWASP-LLM05 stance).</li>
+    </ul>
+
+    <hr>
+
+    <h2 id="alert">4 · Alert &amp; auto-resolve</h2>
+    <p>A new incident emails ops via <code>send_health_alert</code> (SendGrid) — to <code>OPS_ALERT_EMAIL</code>,
+    or every admin parent if that's unset. The email carries the severity, detail, the agent's diagnosis, the
+    remediation status, and any actions taken. When the underlying probe stops firing, the incident
+    auto-resolves and (if it had been alerted) an "all clear" follow-up goes out. Everything is also visible in
+    the admin-only <code>/monitoring</code> console.</p>
+
+    <h2 id="config">Configuration</h2>
+    <table>
+      <thead><tr><th>Variable</th><th>Default</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>MONITORING_ENABLED</code></td><td>true</td><td>Master switch for the cycle</td></tr>
+        <tr><td><code>MONITORING_INTERVAL_MINUTES</code></td><td>10</td><td>Probe cadence (Celery beat)</td></tr>
+        <tr><td><code>AUTO_REMEDIATION_ENABLED</code></td><td><strong>false</strong></td><td>Lets the agent take fix actions; off = diagnose-only</td></tr>
+        <tr><td><code>OPS_ALERT_EMAIL</code></td><td>—</td><td>Alert destination; falls back to all admins</td></tr>
+        <tr><td colspan="3" class="muted" style="padding-top:14px">Thresholds: <code>HEALTH_STALE_CONNECTION_MINUTES</code>, <code>HEALTH_FAILURE_WINDOW_MINUTES</code>, <code>HEALTH_MAX_FAILURE_RATE</code>, <code>HEALTH_MIN_FAILURES_TO_ALERT</code>, <code>HEALTH_QUEUE_DEPTH_WARN</code>.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="observe">Observing it</h2>
+    <p>Run the agent against your real DB + Redis on a synthetic finding and print exactly what it did:</p>
+<pre><code>cd backend &amp;&amp; source .venv/bin/activate
+AUTO_REMEDIATION_ENABLED=true python - &lt;&lt;'PY'
+import json, redis
+from app.config import get_settings
+from app.database import SyncSessionLocal
+from app.services.monitoring import Finding
+from app.services.remediation import remediate
+
+s = get_settings(); r = redis.from_url(s.redis_url)
+finding = Finding(
+    check_name="polling_liveness", fingerprint="polling_stalled",
+    severity="critical", title="Gmail polling has stalled",
+    detail="Active connections exist but no poll ran in the liveness window.",
+    metrics={"active_connections": 3}, remediation_hint="Re-enqueue a poll cycle.")
+with SyncSessionLocal() as db:
+    print(json.dumps(remediate(finding, db=db, redis_client=r), indent=2, default=str))
+PY</code></pre>
+    <p class="muted">Or trigger a full cycle from the <code>/monitoring</code> console ("Run check now"),
+    then expand the incident card to see the diagnosis and actions. The mocked test suite
+    (<code>pytest tests/test_monitoring.py</code>) exercises the loop deterministically with no API cost.</p>
+
+    <h2 id="files">File map</h2>
+    <table>
+      <tbody>
+        <tr><td><code>app/services/monitoring.py</code></td><td>Health probes + the <code>Finding</code> dataclass</td></tr>
+        <tr><td><code>app/services/remediation.py</code></td><td><strong>The agent</strong> — tools, the tool-use loop, guardrails</td></tr>
+        <tr><td><code>app/tasks/monitoring.py</code></td><td>The scheduled cycle: reconcile, run agent, alert, resolve</td></tr>
+        <tr><td><code>app/models/health_incident.py</code></td><td><code>HealthIncident</code> table (deduped, audited)</td></tr>
+        <tr><td><code>app/routers/monitoring.py</code></td><td>Admin API: snapshot, incidents, manual run, status updates</td></tr>
+        <tr><td><code>app/services/notifications.py</code></td><td><code>send_health_alert</code> (SendGrid)</td></tr>
+        <tr><td><code>frontend/src/pages/Monitoring.tsx</code></td><td>The <code>/monitoring</code> console</td></tr>
+      </tbody>
+    </table>
+
+    <p class="muted" style="margin-top:40px; font-size:13px">SafeMail · agentic self-monitoring · generated documentation</p>
+  </main>
+</div>
+</body>
+</html>
