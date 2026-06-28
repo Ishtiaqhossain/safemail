@@ -1,11 +1,9 @@
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
 from fastapi.responses import RedirectResponse
-from google_auth_oauthlib.flow import Flow
-from googleapiclient.discovery import build
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -22,7 +20,7 @@ from app.auth import (
     decode_token, get_current_parent,
 )
 from app.services.crypto import encrypt_token, decrypt_token
-from app.services.gmail import revoke_token
+from app.services.email_providers import get_provider
 from app.services import token_denylist
 from app.services.analytics_events import record_event_async
 from app.models.allowed_email import AllowedEmail
@@ -35,23 +33,6 @@ from app.services.allowlist import is_email_allowed, parent_count
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
-
-GMAIL_SCOPES = [
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/userinfo.email",
-    "openid",
-]
-
-_GOOGLE_CLIENT_CONFIG = lambda: {  # noqa: E731
-    "web": {
-        "client_id": settings.google_client_id,
-        "client_secret": settings.google_client_secret,
-        "redirect_uris": [settings.google_redirect_uri],
-        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-        "token_uri": "https://oauth2.googleapis.com/token",
-    }
-}
-
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit(REGISTER_LIMIT)
@@ -262,9 +243,8 @@ async def google_connect(
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Child not found")
 
-    flow = Flow.from_client_config(_GOOGLE_CLIENT_CONFIG(), scopes=GMAIL_SCOPES, redirect_uri=settings.google_redirect_uri)
     state = create_oauth_state_token(current_parent.id, uuid.UUID(child_id), return_to=return_to)
-    auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent", state=state)
+    auth_url = get_provider("google").authorization_url(state, settings.google_redirect_uri)
     return {"auth_url": auth_url}
 
 
@@ -287,15 +267,10 @@ async def google_callback(code: str, state: str, db: Annotated[AsyncSession, Dep
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid state parameter")
 
-    flow = Flow.from_client_config(
-        _GOOGLE_CLIENT_CONFIG(), scopes=GMAIL_SCOPES,
-        redirect_uri=settings.google_redirect_uri, state=state,
+    provider = get_provider("google")
+    access_token, refresh_token, token_expiry, gmail_address = provider.exchange_code(
+        code, state, settings.google_redirect_uri,
     )
-    flow.fetch_token(code=code)
-    creds = flow.credentials
-
-    userinfo_service = build("oauth2", "v2", credentials=creds)
-    gmail_address = userinfo_service.userinfo().get().execute()["email"]
 
     existing = await db.execute(
         select(GmailConnection).where(
@@ -308,10 +283,11 @@ async def google_callback(code: str, state: str, db: Annotated[AsyncSession, Dep
 
     conn = GmailConnection(
         child_id=child_id,
+        provider="google",
         gmail_address=gmail_address,
-        access_token=encrypt_token(creds.token),
-        refresh_token=encrypt_token(creds.refresh_token),
-        token_expiry=creds.expiry or (datetime.now(timezone.utc) + timedelta(hours=1)),
+        access_token=encrypt_token(access_token),
+        refresh_token=encrypt_token(refresh_token),
+        token_expiry=token_expiry,
     )
     db.add(conn)
     await db.commit()
@@ -368,7 +344,7 @@ async def delete_account(
     )
     for conn in conns.scalars().all():
         try:
-            revoke_token(decrypt_token(conn.refresh_token))
+            get_provider(conn.provider).revoke(decrypt_token(conn.refresh_token))
         except Exception:
             pass
 

@@ -15,6 +15,7 @@ class ChildUpdate(BaseModel):
 
 class GmailConnectionResponse(BaseModel):
     id: uuid.UUID
+    provider: str
     gmail_address: str
     status: str
     last_synced_at: datetime | None

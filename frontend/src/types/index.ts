@@ -42,6 +42,7 @@ export interface Child {
 
 export interface GmailConnection {
   id: string;
+  provider?: string;
   gmail_address: string;
   status: "active" | "revoked" | "error";
   last_synced_at: string | null;
