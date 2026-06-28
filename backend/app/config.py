@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:8000/v1/auth/google/callback"
 
+    # Microsoft (Outlook / Microsoft 365) OAuth — optional; mailbox connect for
+    # this provider only works once these are set (Azure / Microsoft Entra app).
+    microsoft_client_id: str = ""
+    microsoft_client_secret: str = ""
+    microsoft_redirect_uri: str = "http://localhost:8000/v1/auth/oauth/microsoft/callback"
+
     anthropic_api_key: str = ""
     sendgrid_api_key: str = ""
     fcm_service_account_json: str = ""

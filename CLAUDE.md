@@ -202,16 +202,21 @@ alembic downgrade -1
 
 Inbound monitoring is provider-agnostic behind a Strategy interface in
 `app/services/email_providers/` (`base.py` defines `EmailProvider`; `gmail.py` =
-Google/OAuth, `apple.py` = Apple/iCloud over IMAP; `__init__.py` exposes
-`get_provider(name)`). The ingestion loop (`app/tasks/ingestion.py`) dispatches
-through `get_provider(conn.provider)`; the connection row carries a `provider`
-column (default `"google"`).
+Google/OAuth, `microsoft.py` = Outlook/Microsoft 365 over OAuth + Graph,
+`apple.py` = Apple/iCloud over IMAP; `__init__.py` exposes `get_provider(name)`).
+The ingestion loop (`app/tasks/ingestion.py`) dispatches through
+`get_provider(conn.provider)`; the connection row carries a `provider` column
+(default `"google"`).
 
-Two auth models (`provider.auth_kind`): **oauth** (Gmail — `/auth/google/connect`
-+ callback) and **credentials** (Apple — the parent supplies the iCloud address +
+Two auth models (`provider.auth_kind`): **oauth** (Gmail + Microsoft — generic
+routes `GET /auth/oauth/{provider}/connect|callback`; `/auth/google/*` kept as
+aliases; per-provider redirect URIs in config; the OAuth state token carries the
+`provider`) and **credentials** (Apple — the parent supplies the iCloud address +
 an app-specific password to `POST /auth/email/connect`; the password is stored
 Fernet-encrypted, IMAP is read-only via EXAMINE + BODY.PEEK). The frontend connect
-step (Onboarding + Settings) has a provider picker.
+step (Onboarding + Settings) has a provider picker. Microsoft needs a Microsoft
+Entra (Azure) app — `MICROSOFT_CLIENT_ID/SECRET/REDIRECT_URI` (optional; connect
+errors clearly if unset).
 
 **Note:** the table/columns/`message_data` keys still use the legacy `gmail_*`
 names (e.g. `gmail_connections.gmail_address`, `gmail_message_id`) — a deliberate

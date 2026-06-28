@@ -50,6 +50,9 @@ class GmailProvider(EmailProvider):
     auth_kind = "oauth"
 
     # ── OAuth / connect flow ──────────────────────────────────────────────────
+    def oauth_redirect_uri(self) -> str:
+        return settings.google_redirect_uri
+
     def authorization_url(self, state: str, redirect_uri: str) -> str:
         flow = Flow.from_client_config(_client_config(), scopes=OAUTH_SCOPES, redirect_uri=redirect_uri)
         auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent", state=state)
@@ -68,7 +71,8 @@ class GmailProvider(EmailProvider):
 
     # ── Ingestion ─────────────────────────────────────────────────────────────
     def build_client(self, access_token: str, refresh_token: str | None = None,
-                     account_address: str | None = None):  # account_address unused (OAuth)
+                     account_address: str | None = None, token_expiry: datetime | None = None):
+        # account_address/token_expiry unused — the google client always refreshes.
         creds = Credentials(
             token=access_token,
             refresh_token=refresh_token,

@@ -95,6 +95,11 @@ export function PrivacyPage() {
           label the connection.
         </li>
         <li>
+          <strong>Outlook / Microsoft 365</strong> — a Microsoft sign-in granting{" "}
+          <strong>read-only</strong> access via the Microsoft Graph <code>Mail.Read</code> permission,
+          plus your email address to label the connection.
+        </li>
+        <li>
           <strong>Apple Mail (iCloud)</strong> — a read-only IMAP connection authenticated with an
           app-specific password you generate at Apple.
         </li>
@@ -132,6 +137,7 @@ export function PrivacyPage() {
       <H2>Service providers (subprocessors)</H2>
       <ul>
         <li><strong>Google</strong> — a source of monitored email, via the Gmail API.</li>
+        <li><strong>Microsoft</strong> — a source of monitored email, via the Microsoft Graph API.</li>
         <li><strong>Apple</strong> — a source of monitored email, via iCloud IMAP.</li>
         <li><strong>Anthropic (Claude API)</strong> — AI classification and summarization of message content.</li>
         <li><strong>SendGrid</strong> — delivery of alert and account emails.</li>
@@ -158,6 +164,9 @@ export function PrivacyPage() {
         Google Account's security settings at{" "}
         <a className="lp-nav-link" href="https://myaccount.google.com/permissions" target="_blank" rel="noreferrer">
           myaccount.google.com/permissions
+        </a>. For <strong>Outlook / Microsoft 365</strong>, manage app access at{" "}
+        <a className="lp-nav-link" href="https://myaccount.microsoft.com/" target="_blank" rel="noreferrer">
+          myaccount.microsoft.com
         </a>. For <strong>Apple Mail</strong>, revoke the app-specific password at{" "}
         <a className="lp-nav-link" href="https://appleid.apple.com" target="_blank" rel="noreferrer">
           appleid.apple.com

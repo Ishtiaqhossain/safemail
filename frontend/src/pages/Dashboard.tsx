@@ -205,7 +205,7 @@ export default function Dashboard() {
                   {conn ? (
                     <div style={{ background: "#f8fafc", borderRadius: 7, padding: "8px 10px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                        <p style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>{conn.provider === "apple" ? "Apple Mail" : "Gmail"}</p>
+                        <p style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>{conn.provider === "apple" ? "Apple Mail" : conn.provider === "microsoft" ? "Outlook" : "Gmail"}</p>
                         <ConnectionStatus status={conn.status} />
                       </div>
                       <p style={{ fontSize: 12, color: "#374151", wordBreak: "break-all" }}>{conn.gmail_address}</p>

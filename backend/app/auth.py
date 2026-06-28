@@ -97,11 +97,12 @@ def create_password_reset_token(parent_id: uuid.UUID, email: str) -> str:
     )
 
 
-def create_oauth_state_token(parent_id: uuid.UUID, child_id: uuid.UUID, return_to: str | None = None) -> str:
+def create_oauth_state_token(parent_id: uuid.UUID, child_id: uuid.UUID,
+                             provider: str = "google", return_to: str | None = None) -> str:
     _load_keys()
     expire = datetime.now(timezone.utc) + timedelta(minutes=10)
     return jwt.encode(
-        {"parent_id": str(parent_id), "child_id": str(child_id),
+        {"parent_id": str(parent_id), "child_id": str(child_id), "provider": provider,
          "return_to": return_to, "exp": expire, "type": "oauth_state"},
         _private_key,
         algorithm=settings.jwt_algorithm,

@@ -65,7 +65,7 @@ const FAQS = [
   },
   {
     q: "Which email providers are supported?",
-    a: "Gmail and Google Workspace (including school / G Suite for Education addresses), connected with a one-time Google sign-in, and Apple Mail (iCloud), connected with an app-specific password. We're adding more providers — like Outlook and Yahoo — over time.",
+    a: "Gmail and Google Workspace (including school / G Suite for Education addresses), Outlook and Microsoft 365 (including school accounts), and Apple Mail (iCloud). Gmail and Outlook connect with a one-time sign-in; iCloud uses an app-specific password. We're adding more providers — like Yahoo — over time.",
   },
   {
     q: "Will my child know it's there?",

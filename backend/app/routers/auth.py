@@ -235,24 +235,6 @@ async def reset_password(request: Request, body: ResetPasswordRequest, db: Annot
     return {"detail": "Password updated. You can now log in."}
 
 
-@router.get("/google/connect")
-async def google_connect(
-    child_id: str,
-    current_parent: Annotated[Parent, Depends(get_current_parent)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-    return_to: str | None = None,
-):
-    result = await db.execute(
-        select(Child).where(Child.id == uuid.UUID(child_id), Child.parent_id == current_parent.id)
-    )
-    if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Child not found")
-
-    state = create_oauth_state_token(current_parent.id, uuid.UUID(child_id), return_to=return_to)
-    auth_url = get_provider("google").authorization_url(state, settings.google_redirect_uri)
-    return {"auth_url": auth_url}
-
-
 def _safe_return_path(return_to: str | None) -> str:
     """Only allow same-app relative paths to avoid open-redirects."""
     if return_to and return_to.startswith("/") and not return_to.startswith("//"):
@@ -260,11 +242,44 @@ def _safe_return_path(return_to: str | None) -> str:
     return "/dashboard?connected=true"
 
 
-@router.get("/google/callback")
-async def google_callback(code: str, state: str, db: Annotated[AsyncSession, Depends(get_db)]):
+def _resolve_oauth_provider(provider_name: str):
+    """Look up an OAuth provider and its redirect URI, or raise the right HTTP error."""
+    try:
+        provider = get_provider(provider_name)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Unknown email provider")
+    if provider.auth_kind != "oauth":
+        raise HTTPException(status_code=400, detail="This provider does not use an OAuth sign-in")
+    return provider, provider.oauth_redirect_uri()
+
+
+async def _oauth_connect(provider_name: str, child_id: str, return_to: str | None,
+                         current_parent: Parent, db: AsyncSession) -> dict:
+    """Start an OAuth connect for any OAuth provider. Returns {auth_url}."""
+    result = await db.execute(
+        select(Child).where(Child.id == uuid.UUID(child_id), Child.parent_id == current_parent.id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Child not found")
+
+    provider, redirect_uri = _resolve_oauth_provider(provider_name)
+    state = create_oauth_state_token(current_parent.id, uuid.UUID(child_id),
+                                     provider=provider_name, return_to=return_to)
+    try:
+        auth_url = provider.authorization_url(state, redirect_uri)
+    except ProviderUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    return {"auth_url": auth_url}
+
+
+async def _oauth_callback(provider_name: str, code: str, state: str, db: AsyncSession) -> RedirectResponse:
+    """Finish an OAuth connect for any OAuth provider and store the connection."""
     try:
         payload = decode_token(state)
         if payload.get("type") != "oauth_state":
+            raise ValueError
+        # The state must have been minted for this provider's route.
+        if payload.get("provider", "google") != provider_name:
             raise ValueError
         parent_id = uuid.UUID(payload["parent_id"])
         child_id = uuid.UUID(payload["child_id"])
@@ -272,15 +287,20 @@ async def google_callback(code: str, state: str, db: Annotated[AsyncSession, Dep
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid state parameter")
 
-    provider = get_provider("google")
-    access_token, refresh_token, token_expiry, gmail_address = provider.exchange_code(
-        code, state, settings.google_redirect_uri,
-    )
+    provider, redirect_uri = _resolve_oauth_provider(provider_name)
+    try:
+        access_token, refresh_token, token_expiry, account_email = provider.exchange_code(
+            code, state, redirect_uri,
+        )
+    except ProviderAuthError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except ProviderUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
     existing = await db.execute(
         select(GmailConnection).where(
             GmailConnection.child_id == child_id,
-            GmailConnection.gmail_address == gmail_address,
+            GmailConnection.gmail_address == account_email,
         )
     )
     if existing.scalar_one_or_none():
@@ -288,17 +308,55 @@ async def google_callback(code: str, state: str, db: Annotated[AsyncSession, Dep
 
     conn = GmailConnection(
         child_id=child_id,
-        provider="google",
-        gmail_address=gmail_address,
+        provider=provider_name,
+        gmail_address=account_email,
         access_token=encrypt_token(access_token),
         refresh_token=encrypt_token(refresh_token),
         token_expiry=token_expiry,
     )
     db.add(conn)
-    await db.commit()
-    await record_event_async(db, "gmail_connected", parent_id=parent_id)
-
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="This email account is already connected")
+    await record_event_async(db, "gmail_connected", parent_id=parent_id,
+                             properties={"provider": provider_name})
     return RedirectResponse(f"{settings.frontend_url}{_safe_return_path(return_to)}")
+
+
+@router.get("/oauth/{provider}/connect")
+async def oauth_connect(
+    provider: str,
+    child_id: str,
+    current_parent: Annotated[Parent, Depends(get_current_parent)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    return_to: str | None = None,
+):
+    return await _oauth_connect(provider, child_id, return_to, current_parent, db)
+
+
+@router.get("/oauth/{provider}/callback")
+async def oauth_callback(provider: str, code: str, state: str,
+                         db: Annotated[AsyncSession, Depends(get_db)]):
+    return await _oauth_callback(provider, code, state, db)
+
+
+# Legacy Google routes — kept as aliases so the existing Google Cloud redirect URI
+# and the frontend keep working unchanged.
+@router.get("/google/connect")
+async def google_connect(
+    child_id: str,
+    current_parent: Annotated[Parent, Depends(get_current_parent)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    return_to: str | None = None,
+):
+    return await _oauth_connect("google", child_id, return_to, current_parent, db)
+
+
+@router.get("/google/callback")
+async def google_callback(code: str, state: str, db: Annotated[AsyncSession, Depends(get_db)]):
+    return await _oauth_callback("google", code, state, db)
 
 
 @router.delete("/google/{connection_id}", status_code=204)

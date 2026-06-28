@@ -14,9 +14,7 @@ by the user at appleid.apple.com — deleting the connection stops our access).
 from __future__ import annotations
 
 import email
-import html
 import imaplib
-import re
 from datetime import datetime, timezone, timedelta
 from email.header import decode_header, make_header
 from email.utils import getaddresses
@@ -24,6 +22,7 @@ from email.utils import getaddresses
 from app.config import get_settings
 from app.services.email_providers.base import EmailProvider, ProviderAuthError, ProviderUnavailable
 from app.services.email_providers.gmail import _parse_date  # reuse RFC-2822 date parsing
+from app.services.email_providers._html import strip_html
 
 settings = get_settings()
 
@@ -79,7 +78,7 @@ class AppleMailProvider(EmailProvider):
 
     # ── Ingestion ────────────────────────────────────────────────────────────────
     def build_client(self, access_token: str, refresh_token: str | None = None,
-                     account_address: str | None = None):
+                     account_address: str | None = None, token_expiry: datetime | None = None):
         try:
             client = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT, timeout=IMAP_TIMEOUT)
         except OSError as e:
@@ -219,11 +218,5 @@ def _extract_text(msg: email.message.Message) -> str:
     if plain.strip():
         return plain
     if html_body.strip():
-        return _strip_html(html_body)
+        return strip_html(html_body)
     return plain or html_body
-
-
-def _strip_html(s: str) -> str:
-    s = re.sub(r"(?is)<(script|style).*?>.*?</\1>", " ", s)
-    s = re.sub(r"(?s)<[^>]+>", " ", s)
-    return html.unescape(re.sub(r"\s+", " ", s)).strip()
