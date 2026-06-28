@@ -15,9 +15,10 @@ CATEGORY_LABELS = {
 }
 
 
-def send_alert_email(parent_email: str, child_name: str, alert: dict) -> None:
+def send_alert_email(parent_email: str, child_name: str, alert: dict) -> bool:
+    """Returns True if an email was actually sent, False if email is disabled."""
     if not settings.transactional_email_enabled:
-        return
+        return False
     from sendgrid import SendGridAPIClient
     from sendgrid.helpers.mail import Mail
 
@@ -53,6 +54,7 @@ def send_alert_email(parent_email: str, child_name: str, alert: dict) -> None:
         html_content=html_body,
     )
     SendGridAPIClient(settings.sendgrid_api_key).send(message)
+    return True
 
 
 def send_verification_email(to_email: str, verify_url: str) -> None:

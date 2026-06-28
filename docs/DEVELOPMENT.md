@@ -129,13 +129,15 @@ server (`:3000`/`:8000`):
 # 1. Databases (if not already up)
 docker compose up -d postgres redis
 
-# 2. API on :8001 with the E2E seam enabled. Note the explicit DATABASE_URL —
-#    docker-compose creates the `safemail` database (not `openbark`).
-cd backend && source .venv/bin/activate && alembic upgrade head
+# 2. API on :8001 with the E2E seam enabled. Export DATABASE_URL FIRST so both
+#    alembic and uvicorn target the same DB — docker-compose creates `safemail`
+#    (not `openbark`), so relying on the .env default would migrate the wrong DB.
+cd backend && source .venv/bin/activate
+export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/safemail
+alembic upgrade head
 DEBUG=true E2E_SEED_ENABLED=true E2E_SEED_SECRET=dev \
 INVITE_ONLY_ENABLED=false RATE_LIMIT_ENABLED=false TRANSACTIONAL_EMAIL_ENABLED=false \
 COOKIE_SECURE=false FRONTEND_URL=http://localhost:3001 \
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/safemail \
 uvicorn app.main:app --port 8001
 
 # 3. Playwright (boots the Vite dev server on :3001, proxying /v1 → :8001)

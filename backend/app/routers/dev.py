@@ -162,12 +162,18 @@ async def reset(body: ResetBody, db: Annotated[AsyncSession, Depends(get_db)]):
         raise HTTPException(status_code=422, detail="email or email_prefix required")
 
     if body.email:
-        cond = func.lower(Parent.email) == body.email.strip().lower()
-        allow_cond = func.lower(AllowedEmail.email) == body.email.strip().lower()
+        email = body.email.strip().lower()
+        cond = func.lower(Parent.email) == email
+        allow_cond = func.lower(AllowedEmail.email) == email
     else:
         prefix = body.email_prefix.strip().lower()
-        cond = func.lower(Parent.email).like(prefix + "%")
-        allow_cond = func.lower(AllowedEmail.email).like(prefix + "%")
+        # Guard against an accidental mass wipe: must be a non-empty E2E namespace,
+        # and escape LIKE metacharacters so a literal prefix can't become a wildcard.
+        if not prefix.startswith("e2e-"):
+            raise HTTPException(status_code=422, detail="email_prefix must start with 'e2e-'")
+        esc = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        cond = func.lower(Parent.email).like(esc + "%", escape="\\")
+        allow_cond = func.lower(AllowedEmail.email).like(esc + "%", escape="\\")
 
     await db.execute(sa_delete(AllowedEmail).where(allow_cond))
     result = await db.execute(sa_delete(Parent).where(cond))

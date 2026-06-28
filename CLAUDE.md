@@ -2,7 +2,7 @@
 
 ## What this project is
 
-SafeMail is an AI-powered email monitoring service for parents. It connects to a child's Gmail account, scans emails with Claude AI, and sends parents a smart alert only when something genuinely dangerous is detected. Raw email body text is never stored — only the AI-generated summary and metadata.
+SafeMail is an AI-powered email monitoring service for parents. It connects to a child's email account — Gmail, Outlook / Microsoft 365, or Apple iCloud (behind a provider-agnostic ingestion layer) — scans emails with Claude AI, and sends parents a smart alert only when something genuinely dangerous is detected. Raw email body text is never stored — only the AI-generated summary and metadata.
 
 The six detection categories (enum values used throughout the code): `self_harm`, `grooming`, `bullying`, `drugs_alcohol`, `stranger_contact`, `personal_info_sharing`.
 
@@ -235,9 +235,12 @@ deferral; they're just identifiers. A provider-neutral rename is future cleanup.
    `auth_kind`, implement the connect method for that kind (OAuth or
    `connect_with_credentials`) + the ingestion methods. `extract_message_data` MUST
    return the canonical dict shape.
-2. Register it in `app/services/email_providers/__init__.py` `_PROVIDERS`.
-3. Wire the connect UI (reuse `/auth/email/connect` for credentials providers; add a
-   route for new OAuth providers) and add it to the frontend provider picker.
+2. Register it in `app/services/email_providers/__init__.py` `_PROVIDERS`. For an
+   **OAuth** provider also add an `oauth_redirect_uri()` + its `*_redirect_uri`
+   setting — the generic `/auth/oauth/{provider}/connect|callback` routes then work
+   with no new route code (they resolve via the registry).
+3. Wire the connect UI (reuse `/auth/email/connect` for credentials providers; OAuth
+   providers use the generic route) and add it to the frontend provider picker.
 
 ## Adding a new detection category
 

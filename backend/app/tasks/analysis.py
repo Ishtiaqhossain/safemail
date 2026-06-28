@@ -161,8 +161,8 @@ def deliver_alert(self, alert_id: str):
                 "ai_response_script": alert.ai_response_script,
             }
             try:
-                send_alert_email(parent.email, child.display_name, alert_dict)
-                channels.append("email")
+                if send_alert_email(parent.email, child.display_name, alert_dict):
+                    channels.append("email")
             except Exception as e:
                 logger.error("Email delivery failed: %s", e)
 
@@ -173,7 +173,9 @@ def deliver_alert(self, alert_id: str):
                 except Exception as e:
                     logger.error("Push delivery failed: %s", e)
 
-            alert.notified_at = datetime.now(timezone.utc)
+            # Only stamp notified_at when a notification actually went out.
+            if channels:
+                alert.notified_at = datetime.now(timezone.utc)
             db.commit()
         write_task_log(db, "deliver_alert", "success",
                        meta={"alert_id": alert_id, "channels": channels})

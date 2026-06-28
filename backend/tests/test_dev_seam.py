@@ -66,3 +66,26 @@ def test_seed_routes_require_secret_header():
     # and the guard rejects before any DB access.
     env = {"DEBUG": "true", "E2E_SEED_ENABLED": "true", "E2E_SEED_SECRET": "s3cret"}
     assert _run(_GUARD_404, env) == "NOHDR 404 WRONG 404"
+
+
+_RESET_VALIDATION = """
+import asyncio, httpx, app.main as m
+from httpx import ASGITransport
+H = {"X-E2E-Seed-Secret": "s3cret"}
+
+async def go():
+    t = ASGITransport(app=m.app)
+    async with httpx.AsyncClient(transport=t, base_url="http://t") as c:
+        # Non-e2e prefix and a blank/whitespace prefix must be rejected (422)
+        # BEFORE any DELETE — guards against an accidental mass wipe.
+        a = await c.post("/v1/dev/reset", json={"email_prefix": "notjunk"}, headers=H)
+        b = await c.post("/v1/dev/reset", json={"email_prefix": "   "}, headers=H)
+        print("BADPREFIX", a.status_code, "BLANK", b.status_code)
+
+asyncio.run(go())
+"""
+
+
+def test_reset_rejects_non_e2e_or_blank_prefix():
+    env = {"DEBUG": "true", "E2E_SEED_ENABLED": "true", "E2E_SEED_SECRET": "s3cret"}
+    assert _run(_RESET_VALIDATION, env) == "BADPREFIX 422 BLANK 422"

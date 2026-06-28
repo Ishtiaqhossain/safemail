@@ -76,6 +76,11 @@ def poll_connection(self, connection_id: str):
                     from app.tasks.analysis import analyze_message
                     analyze_message.delay(message_data)
                     _redis.setex(f"dedup:{conn.id}:{message_id}", DEDUP_TTL, "1")
+                except ProviderAuthError:
+                    # A revoked/expired grant surfaced mid-fetch — don't swallow it
+                    # as a per-message blip; let the outer handler mark the
+                    # connection errored and notify the parent to reconnect.
+                    raise
                 except Exception as e:
                     logger.warning("Failed to process message %s: %s", message_id, e)
 
