@@ -211,6 +211,43 @@ def send_health_alert(to_emails, incident: dict, *, resolved: bool = False) -> N
     SendGridAPIClient(settings.sendgrid_api_key).send(message)
 
 
+def send_waitlist_notification(to_emails, entry_email: str, source: str,
+                               pending_count: int | None = None) -> None:
+    """Notify ops that someone joined the waitlist. ``to_emails`` is one address or
+    a list. Honors the global email switch; no-ops if there are no recipients."""
+    if not settings.transactional_email_enabled:
+        return
+    recipients = [e for e in (to_emails if isinstance(to_emails, list) else [to_emails]) if e]
+    if not recipients:
+        return
+
+    from sendgrid import SendGridAPIClient
+    from sendgrid.helpers.mail import Mail
+
+    safe_email = html.escape(entry_email)
+    safe_source = html.escape(source or "landing")
+    count_line = (
+        f'<p style="color:#64748b">Pending waitlist size: {int(pending_count)}</p>'
+        if pending_count is not None else ""
+    )
+    html_body = f"""
+<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2 style="color:#0f172a">New SafeMail waitlist signup</h2>
+  <p><strong>{safe_email}</strong> just joined the waitlist.</p>
+  <p style="color:#64748b">Source: {safe_source}</p>
+  {count_line}
+  <p style="color:#94a3b8;font-size:13px">Approve them from the admin console to let them register.</p>
+</div>"""
+
+    message = Mail(
+        from_email=settings.email_from,
+        to_emails=recipients,
+        subject=f"[SafeMail] New waitlist signup — {entry_email}",
+        html_content=html_body,
+    )
+    SendGridAPIClient(settings.sendgrid_api_key).send(message)
+
+
 def send_push_notification(fcm_token: str, child_name: str, alert: dict) -> None:
     if not settings.fcm_service_account_json or not fcm_token:
         return

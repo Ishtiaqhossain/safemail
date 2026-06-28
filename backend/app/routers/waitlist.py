@@ -11,21 +11,49 @@ so we skip the waitlist entirely and return ``status: "already_invited"`` —
 the landing page uses this to send them to the register form instead of
 showing the "we'll email you a spot" wait message.
 """
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.database import get_db
 from app.ratelimit import limiter, WAITLIST_LIMIT
+from app.models.parent import Parent
 from app.models.waitlist_entry import WaitlistEntry
 from app.services.allowlist import normalize_email, is_email_allowed
 from app.services.analytics_events import record_event_async
+from app.services.notifications import send_waitlist_notification
 
 router = APIRouter(prefix="/waitlist", tags=["waitlist"])
+logger = logging.getLogger(__name__)
+settings = get_settings()
+
+
+async def _notify_ops_new_signup(db: AsyncSession, email: str, source: str) -> None:
+    """Best-effort ops email on a new waitlist signup. Never fails the request.
+    Recipients: OPS_ALERT_EMAIL if set, else every admin parent."""
+    try:
+        if settings.ops_alert_email:
+            recipients = [settings.ops_alert_email]
+        else:
+            recipients = list((await db.execute(
+                select(Parent.email).where(Parent.is_admin.is_(True))
+            )).scalars().all())
+        if not recipients:
+            return
+        pending = (await db.execute(
+            select(func.count()).select_from(WaitlistEntry)
+        )).scalar_one()
+        # SendGrid client is blocking — run off the event loop.
+        await run_in_threadpool(send_waitlist_notification, recipients, email, source, pending)
+    except Exception as e:
+        logger.warning("Waitlist signup notification failed for %s: %s", email, e)
 
 
 class WaitlistRequest(BaseModel):
@@ -54,9 +82,11 @@ async def join_waitlist(
     if existing is not None:
         return {"status": "ok"}
 
+    created = False
     db.add(WaitlistEntry(email=email, source=(body.source or "landing")))
     try:
         await db.commit()
+        created = True
     except IntegrityError:
         # Concurrent duplicate request — treat as success.
         await db.rollback()
@@ -64,4 +94,8 @@ async def join_waitlist(
     # Durable top-of-funnel event (waitlist rows are deleted on approval, so the
     # event is the lasting record of the signup). Source = acquisition channel.
     await record_event_async(db, "waitlist_joined", properties={"source": body.source or "landing"})
+
+    # Notify ops only on a genuinely new entry (not duplicates / races).
+    if created:
+        await _notify_ops_new_signup(db, email, body.source or "landing")
     return {"status": "ok"}
