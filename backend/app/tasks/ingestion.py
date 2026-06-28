@@ -8,6 +8,7 @@ from app.database import SyncSessionLocal
 from app.models.gmail_connection import GmailConnection
 from app.services.crypto import decrypt_token, encrypt_token
 from app.services.email_providers import get_provider
+from app.services.email_providers.base import ProviderAuthError
 from app.config import get_settings
 from app.tasks.utils import write_task_log, TaskTimer
 
@@ -36,6 +37,8 @@ def poll_connection(self, connection_id: str):
         if not conn or conn.status != "active":
             return
 
+        provider = None
+        service = None
         try:
             provider = get_provider(conn.provider)
             access_token = decrypt_token(conn.access_token)
@@ -54,7 +57,9 @@ def poll_connection(self, connection_id: str):
                 _, service = provider.build_client(new_access, new_refresh, conn.gmail_address)
 
             message_ids = provider.list_message_ids(service)
-            new_ids = [mid for mid in message_ids if not _redis.exists(f"dedup:{mid}")]
+            # Dedup is namespaced per connection so message ids from different
+            # accounts (e.g. small IMAP UIDs) can't collide in the shared set.
+            new_ids = [mid for mid in message_ids if not _redis.exists(f"dedup:{conn.id}:{mid}")]
 
             for message_id in new_ids:
                 try:
@@ -67,7 +72,7 @@ def poll_connection(self, connection_id: str):
                     )
                     from app.tasks.analysis import analyze_message
                     analyze_message.delay(message_data)
-                    _redis.setex(f"dedup:{message_id}", DEDUP_TTL, "1")
+                    _redis.setex(f"dedup:{conn.id}:{message_id}", DEDUP_TTL, "1")
                 except Exception as e:
                     logger.warning("Failed to process message %s: %s", message_id, e)
 
@@ -79,8 +84,10 @@ def poll_connection(self, connection_id: str):
 
         except Exception as exc:
             logger.error("Poll failed for connection %s: %s", connection_id, exc)
+            # Providers raise ProviderAuthError on a revoked/bad grant; fall back to
+            # string matching for providers (Gmail) that surface library errors.
             exc_l = str(exc).lower()
-            is_auth_failure = (
+            is_auth_failure = isinstance(exc, ProviderAuthError) or (
                 "invalid_grant" in exc_l or "401" in exc_l
                 or "authenticationfailed" in exc_l or "invalid credentials" in exc_l
                 or "login failed" in exc_l
@@ -93,6 +100,13 @@ def poll_connection(self, connection_id: str):
             write_task_log(db, "poll_connection", "failure",
                            error=str(exc), duration_ms=timer.elapsed_ms(),
                            meta={"connection_id": connection_id, "auth_failure": is_auth_failure})
+        finally:
+            # Release any persistent connection (IMAP logout); no-op for Gmail.
+            if provider is not None and service is not None:
+                try:
+                    provider.close(service)
+                except Exception:
+                    pass
             if not is_auth_failure:
                 raise self.retry(exc=exc, countdown=60)
 

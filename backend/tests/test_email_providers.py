@@ -15,6 +15,7 @@ from app.services.email_providers import get_provider, GmailProvider
 from app.services.email_providers.gmail import GmailProvider as GmailProviderImpl
 from app.services.email_providers import apple as apple_mod
 from app.services.email_providers.apple import AppleMailProvider
+from app.services.email_providers.base import ProviderAuthError
 
 
 def _raw_message(*, sender: str, to: str, cc: str = "", subject: str = "Hi",
@@ -142,14 +143,34 @@ class TestAppleProvider:
         assert account == "kid@icloud.com"
         assert isinstance(expiry, datetime)
 
-    def test_connect_with_credentials_bad_password_raises_valueerror(self, monkeypatch):
+    def test_connect_with_credentials_bad_password_raises_auth_error(self, monkeypatch):
         class FakeIMAP:
             def __init__(self, *a, **k): pass
             def login(self, u, p): raise imaplib.IMAP4.error("[AUTHENTICATIONFAILED] failed")
             def logout(self): pass
         monkeypatch.setattr(apple_mod.imaplib, "IMAP4_SSL", FakeIMAP)
-        with pytest.raises(ValueError):
+        with pytest.raises(ProviderAuthError):
             AppleMailProvider().connect_with_credentials("kid@icloud.com", "wrong")
+
+    def test_html_only_body_is_stripped(self):
+        m = EmailMessage()
+        m["From"] = "friend@example.com"
+        m["To"] = "kid@icloud.com"
+        m["Subject"] = "Hi"
+        m["Message-ID"] = "<h@x>"
+        m["Date"] = "Wed, 02 Oct 2002 13:00:00 GMT"
+        m.set_content("<p>hello <b>world</b></p>", subtype="html")
+        raw = {"rfc822": m.as_bytes(), "uid": "1", "mailbox": "INBOX"}
+        d = AppleMailProvider().extract_message_data(raw, "kid@icloud.com", "c", "k")
+        assert "hello" in d["body_text"] and "world" in d["body_text"]
+        assert "<" not in d["body_text"]
+
+    def test_encoded_word_subject_is_decoded(self):
+        raw = {"rfc822": _rfc822(sender="a@b.com", to="kid@icloud.com",
+                                 subject="=?UTF-8?B?SGVsbG8gV29ybGQ=?="),
+               "uid": "1", "mailbox": "INBOX"}
+        d = AppleMailProvider().extract_message_data(raw, "kid@icloud.com", "c", "k")
+        assert d["subject"] == "Hello World"
 
 
 class TestShimDelegates:

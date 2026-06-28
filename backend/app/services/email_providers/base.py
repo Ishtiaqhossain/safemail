@@ -21,6 +21,17 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 
 
+class ProviderAuthError(Exception):
+    """Credentials are bad / the grant is revoked — the parent must reconnect.
+    The ingestion loop flips the connection to 'error' and emails the parent;
+    the connect endpoint maps it to HTTP 400."""
+
+
+class ProviderUnavailable(Exception):
+    """A transient failure reaching the provider (DNS/TLS/timeout/5xx) — retry.
+    The connect endpoint maps it to HTTP 503; ingestion retries."""
+
+
 class EmailProvider(ABC):
     #: Stable provider key stored on the connection row (e.g. "google", "apple").
     name: str
@@ -68,3 +79,8 @@ class EmailProvider(ABC):
     @abstractmethod
     def revoke(self, token: str) -> bool:
         """Best-effort revoke of the grant. True on success (or already-invalid)."""
+
+    def close(self, client) -> None:
+        """Release any persistent connection (e.g. IMAP logout). Default no-op
+        for stateless HTTP clients like Gmail."""
+        return None
