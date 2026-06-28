@@ -69,7 +69,7 @@ export function PrivacyPage() {
     <LegalShell title="Privacy Policy">
       <p>
         {COMPANY_NAME} ("we", "us") provides an AI-powered email-safety service that lets a
-        parent or guardian ("you") monitor a child's Gmail account for signs of danger. This
+        parent or guardian ("you") monitor a child's email account for signs of danger. This
         policy explains what data we access, how we use it, and the choices you have. We built the
         service to collect as little as possible: <strong>we never store the raw text of any email.</strong>
       </p>
@@ -80,16 +80,30 @@ export function PrivacyPage() {
         securely hashed (bcrypt) password. We do not store your password in plain text.
       </p>
       <p>
-        <strong>Child profile data.</strong> A display name you choose for the child and the Gmail
+        <strong>Child profile data.</strong> A display name you choose for the child and the email
         address you connect for monitoring.
       </p>
       <p>
-        <strong>Google account data (via Gmail).</strong> With your explicit authorization, we
-        request <strong>read-only</strong> access to the connected Gmail account using the{" "}
-        <code>gmail.readonly</code> scope, plus your email address (<code>userinfo.email</code>) to
-        label the connection. We read message content <em>only transiently, in memory,</em> to
-        analyze it for safety risks. We do <strong>not</strong> retain email bodies, attachments,
-        contact lists, or message contents after analysis.
+        <strong>Connected mailbox data.</strong> With your explicit authorization, we request{" "}
+        <strong>read-only</strong> access to the child's email account so we can analyze incoming and
+        outgoing messages for safety risks. How access is granted depends on the provider:
+      </p>
+      <ul>
+        <li>
+          <strong>Gmail / Google Workspace</strong> — a Google OAuth sign-in using the{" "}
+          <code>gmail.readonly</code> scope, plus your email address (<code>userinfo.email</code>) to
+          label the connection.
+        </li>
+        <li>
+          <strong>Apple Mail (iCloud)</strong> — a read-only IMAP connection authenticated with an
+          app-specific password you generate at Apple.
+        </li>
+      </ul>
+      <p>
+        We read message content <em>only transiently, in memory,</em> to analyze it. We do{" "}
+        <strong>not</strong> retain email bodies, attachments, contact lists, or message contents
+        after analysis. We expect to support additional providers over time; access for any new
+        provider will likewise be read-only and limited to what analysis requires.
       </p>
       <p>
         <strong>Alert data we do store.</strong> After analysis, we keep only the AI-generated
@@ -117,7 +131,8 @@ export function PrivacyPage() {
 
       <H2>Service providers (subprocessors)</H2>
       <ul>
-        <li><strong>Google</strong> — source of the monitored email, via the Gmail API.</li>
+        <li><strong>Google</strong> — a source of monitored email, via the Gmail API.</li>
+        <li><strong>Apple</strong> — a source of monitored email, via iCloud IMAP.</li>
         <li><strong>Anthropic (Claude API)</strong> — AI classification and summarization of message content.</li>
         <li><strong>SendGrid</strong> — delivery of alert and account emails.</li>
         <li><strong>Firebase Cloud Messaging</strong> — optional push notifications.</li>
@@ -126,21 +141,26 @@ export function PrivacyPage() {
 
       <H2>Data security &amp; retention</H2>
       <p>
-        Google OAuth tokens are encrypted at rest (Fernet/AES) before being written to our
-        database and are never exposed in our interface or logs. Access to authentication endpoints
-        is rate-limited and session tokens can be revoked. We retain account, child, and alert
-        records for as long as your account is active. When you disconnect a Gmail account or delete
-        your account, the associated stored records and tokens are deleted, and the OAuth grant is
-        revoked with Google.
+        Email-access credentials — Google OAuth tokens and Apple app-specific passwords — are
+        encrypted at rest (Fernet/AES) before being written to our database and are never exposed in
+        our interface or logs. Access to authentication endpoints is rate-limited and session tokens
+        can be revoked. We retain account, child, and alert records for as long as your account is
+        active. When you disconnect an email account or delete your account, the associated stored
+        records and credentials are deleted; for Google connections the OAuth grant is also revoked
+        with Google.
       </p>
 
       <H2>Your choices &amp; rights</H2>
       <p>
-        You can disconnect a child's Gmail account at any time from your dashboard, which revokes our
-        access. You can delete your account, which removes your stored data. You may also revoke our
-        access directly from your Google Account's security settings at{" "}
+        You can disconnect a child's email account at any time from your dashboard or settings, which
+        removes our stored credentials and stops monitoring. You can delete your account, which
+        removes your stored data. For <strong>Gmail</strong>, you may also revoke our access from your
+        Google Account's security settings at{" "}
         <a className="lp-nav-link" href="https://myaccount.google.com/permissions" target="_blank" rel="noreferrer">
           myaccount.google.com/permissions
+        </a>. For <strong>Apple Mail</strong>, revoke the app-specific password at{" "}
+        <a className="lp-nav-link" href="https://appleid.apple.com" target="_blank" rel="noreferrer">
+          appleid.apple.com
         </a>. For any data request, contact us at{" "}
         <a className="lp-nav-link" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
       </p>

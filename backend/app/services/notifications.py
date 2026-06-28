@@ -114,15 +114,15 @@ def send_reconnect_email(to_email: str, child_name: str, gmail_address: str, rec
 
     html_body = f"""
 <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-  <h2 style="color:#0f172a">Action needed: reconnect {safe_child}'s Gmail</h2>
+  <h2 style="color:#0f172a">Action needed: reconnect {safe_child}'s email</h2>
   <p>SafeMail has lost access to <strong>{safe_gmail}</strong>, so we are no
-     longer monitoring {safe_child}'s email. This usually happens when the Google
-     permission is revoked or expires.</p>
+     longer monitoring {safe_child}'s email. This usually happens when access is
+     revoked or the sign-in / app password expires.</p>
   <p style="color:#b91c1c;font-weight:600">Until you reconnect, no safety alerts will be sent for this account.</p>
   <p style="margin:24px 0">
     <a href="{reconnect_url}"
        style="background:#2563eb;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-weight:600">
-      Reconnect Gmail
+      Reconnect email
     </a>
   </p>
   <p style="color:#64748b;font-size:13px">If you intentionally disconnected this account, you can ignore this email.</p>
