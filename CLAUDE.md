@@ -198,6 +198,24 @@ alembic upgrade head
 alembic downgrade -1
 ```
 
+## Inbound email providers
+
+Inbound monitoring is provider-agnostic behind a Strategy interface in
+`app/services/email_providers/` (`base.py` defines `EmailProvider`; `gmail.py` is the
+only implementation today; `__init__.py` exposes `get_provider(name)`). The ingestion
+loop (`app/tasks/ingestion.py`) and the OAuth routes (`app/routers/auth.py`) dispatch
+through `get_provider(conn.provider)`. The connection row carries a `provider` column
+(default `"google"`). **Note:** the table/columns/`message_data` keys still use the
+legacy `gmail_*` names (and the UI still says "Gmail") — a deliberate deferral; the
+provider-neutral rename + provider-picker UI land with the first non-Gmail provider.
+
+### Adding an email provider (future)
+1. Implement `EmailProvider` in `app/services/email_providers/<name>.py` (OAuth +
+   ingestion methods); `extract_message_data` MUST return the canonical dict shape.
+2. Register it in `app/services/email_providers/__init__.py` `_PROVIDERS`.
+3. Generalize the OAuth routes to a provider param (currently hard-wired to `google`)
+   and add the provider-picker UI + provider-neutral renames.
+
 ## Adding a new detection category
 
 1. Add the category string to `SYSTEM_PROMPT` in `backend/app/services/analysis.py`

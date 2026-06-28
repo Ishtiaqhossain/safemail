@@ -45,9 +45,13 @@ async def test_login_wrong_password(client: AsyncClient):
 
 
 async def test_delete_account_wipes_all_data(client: AsyncClient, db, monkeypatch):
-    # Don't make a real network call to Google's revoke endpoint.
+    # Don't make a real network call to Google's revoke endpoint. Account deletion
+    # now revokes via the provider abstraction: get_provider(conn.provider).revoke().
     revoked = []
-    monkeypatch.setattr("app.routers.auth.revoke_token", lambda t: revoked.append(t) or True)
+    monkeypatch.setattr(
+        "app.services.email_providers.gmail.GmailProvider.revoke",
+        lambda self, t: revoked.append(t) or True,
+    )
 
     email = "leaving@example.com"
     reg = await client.post("/v1/auth/register", json={"email": email, "password": "pass1234"})

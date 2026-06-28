@@ -7,10 +7,7 @@ from app.worker import celery
 from app.database import SyncSessionLocal
 from app.models.gmail_connection import GmailConnection
 from app.services.crypto import decrypt_token, encrypt_token
-from app.services.gmail import (
-    build_gmail_service, refresh_if_needed, list_message_ids,
-    fetch_message, extract_message_data,
-)
+from app.services.email_providers import get_provider
 from app.config import get_settings
 from app.tasks.utils import write_task_log, TaskTimer
 
@@ -40,25 +37,26 @@ def poll_connection(self, connection_id: str):
             return
 
         try:
+            provider = get_provider(conn.provider)
             access_token = decrypt_token(conn.access_token)
             refresh_token = decrypt_token(conn.refresh_token)
-            creds, service = build_gmail_service(access_token, refresh_token)
+            creds, service = provider.build_client(access_token, refresh_token)
 
             if creds.expired:
-                new_access, new_refresh, expiry = refresh_if_needed(creds)
+                new_access, new_refresh, expiry = provider.refresh_if_needed(creds)
                 conn.access_token = encrypt_token(new_access)
                 conn.refresh_token = encrypt_token(new_refresh)
                 conn.token_expiry = expiry
                 db.commit()
-                _, service = build_gmail_service(new_access, new_refresh)
+                _, service = provider.build_client(new_access, new_refresh)
 
-            message_ids = list_message_ids(service)
+            message_ids = provider.list_message_ids(service)
             new_ids = [mid for mid in message_ids if not _redis.exists(f"dedup:{mid}")]
 
             for message_id in new_ids:
                 try:
-                    raw = fetch_message(service, message_id)
-                    message_data = extract_message_data(
+                    raw = provider.fetch_message(service, message_id)
+                    message_data = provider.extract_message_data(
                         raw,
                         conn.gmail_address,
                         str(conn.id),
