@@ -259,14 +259,15 @@ export default function Onboarding() {
                   <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 9, padding: "12px 14px", marginBottom: 16 }}>
                     <p style={{ fontSize: 13, fontWeight: 600, color: "#92400e", margin: "0 0 6px" }}>You'll need an app-specific password</p>
                     <p style={{ fontSize: 13, color: "#78350f", margin: 0, lineHeight: 1.55 }}>
+                      Use the child's <strong>@icloud.com</strong> (or @me.com / @mac.com) mailbox — not a Gmail address.
                       iCloud needs an <strong>app-specific password</strong> (not the Apple ID password). Create one at{" "}
                       <a href="https://appleid.apple.com" target="_blank" rel="noreferrer" style={{ color: "#92400e", fontWeight: 600 }}>appleid.apple.com</a>{" "}
                       → Sign-In and Security → App-Specific Passwords. It's read-only and you can disconnect anytime.
                     </p>
                   </div>
-                  <label style={lbl}>iCloud email</label>
+                  <label style={lbl}>Child's iCloud email</label>
                   <input value={appleEmail} onChange={(e) => setAppleEmail(e.target.value)}
-                         placeholder="name@icloud.com" inputMode="email" style={{ width: "100%", marginBottom: 12 }} />
+                         placeholder="child@icloud.com" inputMode="email" style={{ width: "100%", marginBottom: 12 }} />
                   <label style={lbl}>App-specific password</label>
                   <input type="password" value={applePassword} onChange={(e) => setApplePassword(e.target.value)}
                          placeholder="xxxx-xxxx-xxxx-xxxx" style={{ width: "100%", marginBottom: 14 }} />
