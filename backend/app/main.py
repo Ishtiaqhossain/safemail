@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import get_settings
 from app.ratelimit import limiter
-from app.routers import auth, children, alerts, preferences, stats, admin, developer, onboarding, waitlist, monitoring
+from app.routers import auth, children, alerts, preferences, stats, admin, developer, onboarding, waitlist, monitoring, analytics
 
 settings = get_settings()
 logger = logging.getLogger("safemail")
@@ -60,6 +60,7 @@ app.include_router(developer.router, prefix=API_PREFIX)
 app.include_router(onboarding.router, prefix=API_PREFIX)
 app.include_router(waitlist.router, prefix=API_PREFIX)
 app.include_router(monitoring.router, prefix=API_PREFIX)
+app.include_router(analytics.router, prefix=API_PREFIX)
 
 
 @app.get("/health")

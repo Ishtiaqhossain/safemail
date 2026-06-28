@@ -24,6 +24,7 @@ from app.auth import (
 from app.services.crypto import encrypt_token, decrypt_token
 from app.services.gmail import revoke_token
 from app.services import token_denylist
+from app.services.analytics_events import record_event_async
 from app.models.allowed_email import AllowedEmail
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, ForgotPasswordRequest, ResetPasswordRequest
 from app.ratelimit import (
@@ -72,6 +73,7 @@ async def register(request: Request, body: RegisterRequest, response: Response, 
     db.add(parent)
     await db.commit()
     await db.refresh(parent)
+    await record_event_async(db, "account_registered", parent_id=parent.id)
 
     # Send verification email (best-effort — don't fail registration if email is down)
     try:
@@ -109,6 +111,7 @@ async def login(request: Request, body: LoginRequest, response: Response, db: An
             detail="Your access to the SafeMail alpha isn't enabled.",
         )
 
+    await record_event_async(db, "login_succeeded", parent_id=parent.id)
     _set_refresh_cookie(response, create_refresh_token(parent.id))
     return {
         "access_token": create_access_token(parent.id, parent.email, parent.is_admin, parent.is_developer, parent.is_email_verified),
@@ -186,6 +189,7 @@ async def verify_email(token: str, db: Annotated[AsyncSession, Depends(get_db)])
 
     parent.is_email_verified = True
     await db.commit()
+    await record_event_async(db, "email_verified", parent_id=parent.id)
     return RedirectResponse(f"{settings.frontend_url}/dashboard?verified=true")
 
 
@@ -311,6 +315,7 @@ async def google_callback(code: str, state: str, db: Annotated[AsyncSession, Dep
     )
     db.add(conn)
     await db.commit()
+    await record_event_async(db, "gmail_connected", parent_id=parent_id)
 
     return RedirectResponse(f"{settings.frontend_url}{_safe_return_path(return_to)}")
 
@@ -331,6 +336,7 @@ async def disconnect_gmail(
         raise HTTPException(status_code=404, detail="Connection not found")
     await db.delete(conn)
     await db.commit()
+    await record_event_async(db, "gmail_disconnected", parent_id=current_parent.id)
 
 
 @router.delete("/account", status_code=204)
@@ -348,6 +354,10 @@ async def delete_account(
     erased. No raw email bodies are stored, so nothing else persists.
     """
     from sqlalchemy import func, delete as sa_delete
+
+    # Churn signal recorded anonymously (parent_id=None) so it survives the
+    # cascade delete below and stays countable after the account is gone.
+    await record_event_async(db, "account_deleted")
 
     # 1. Revoke every Gmail grant at Google so we stop holding access after
     #    deletion. Best-effort — a failed revoke must not block local erasure.

@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { adminApi } from "@/api/admin";
 import type { AdminOverview, AdminEvent, TaskLogEntry, LlmStats, AllowedEmail, WaitlistEntry, FeedbackInsights } from "@/types";
+import { analyticsApi } from "@/api/analytics";
+import type { AnalyticsOverview, AnalyticsFunnel, AnalyticsEvents, FunnelStage } from "@/api/analytics";
 
-type Tab = "overview" | "llm" | "feedback" | "allowlist" | "waitlist" | "events" | "tasks";
+type Tab = "overview" | "analytics" | "llm" | "feedback" | "allowlist" | "waitlist" | "events" | "tasks";
 
 const fmtNum = (n: number) => n.toLocaleString();
 const fmtCost = (n: number) => (n === 0 ? "$0.00" : n < 0.01 ? "< $0.01" : `$${n.toFixed(n >= 1 ? 2 : 4)}`);
@@ -602,6 +604,132 @@ function WaitlistTab() {
   );
 }
 
+// ── Analytics tab ───────────────────────────────────────────────────────────────
+
+const pct = (x: number | null | undefined) => (x == null ? "—" : `${(x * 100).toFixed(1)}%`);
+
+function fmtDuration(secs: number | null): string {
+  if (secs == null) return "—";
+  if (secs < 90) return `${Math.round(secs)}s`;
+  if (secs < 5400) return `${Math.round(secs / 60)}m`;
+  if (secs < 172800) return `${(secs / 3600).toFixed(1)}h`;
+  return `${(secs / 86400).toFixed(1)}d`;
+}
+
+function FunnelView({ stages }: { stages: FunnelStage[] }) {
+  const top = stages[0]?.count || 0;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {stages.map((s, i) => {
+        const widthPct = top ? Math.max((s.count / top) * 100, 2) : 0;
+        return (
+          <div key={s.key}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}>
+              <span style={{ fontWeight: 600, color: "#0f172a" }}>{s.label}</span>
+              <span style={{ color: "#64748b" }}>
+                {fmtNum(s.count)}
+                {i > 0 && s.step_conversion != null && (
+                  <>
+                    {" · "}<span style={{ color: "#16a34a" }}>{pct(s.step_conversion)}</span>
+                    {" "}<span style={{ color: "#dc2626" }}>(−{pct(s.drop_off)})</span>
+                  </>
+                )}
+              </span>
+            </div>
+            <div style={{ background: "#f1f5f9", borderRadius: 6, height: 22, overflow: "hidden" }}>
+              <div style={{ width: `${widthPct}%`, height: "100%", background: "#2563eb" }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function AnalyticsTab() {
+  const [days, setDays] = useState(30);
+  const [ov, setOv] = useState<AnalyticsOverview | null>(null);
+  const [fn, setFn] = useState<AnalyticsFunnel | null>(null);
+  const [ev, setEv] = useState<AnalyticsEvents | null>(null);
+
+  useEffect(() => {
+    analyticsApi.overview(days).then(setOv);
+    analyticsApi.funnel(days).then(setFn);
+    analyticsApi.events(days).then(setEv);
+  }, [days]);
+
+  if (!ov || !fn || !ev) return <p style={{ color: "#64748b" }}>Loading…</p>;
+
+  const listRow = (label: string, count: number, mono = false) => (
+    <div key={label} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13, padding: "3px 0" }}>
+      <span style={{ color: "#475569", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                     fontFamily: mono ? "monospace" : undefined, fontSize: mono ? 12 : 13 }}>{label}</span>
+      <span style={{ fontWeight: 600 }}>{fmtNum(count)}</span>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "flex", gap: 8 }}>
+        {[7, 30, 90].map((d) => (
+          <button key={d} onClick={() => setDays(d)} style={{
+            padding: "4px 12px", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer",
+            border: "1px solid #e2e8f0",
+            background: days === d ? "#2563eb" : "#fff", color: days === d ? "#fff" : "#64748b",
+          }}>{d}d</button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <StatCard label="Unique visitors" value={fmtNum(ov.unique_visitors)} />
+        <StatCard label="Page views" value={fmtNum(ov.page_views)} />
+        <StatCard label="Waitlist" value={fmtNum(ov.waitlist_joined)} />
+        <StatCard label="Signups" value={fmtNum(ov.signups)} />
+        <StatCard label="Activated" value={fmtNum(ov.activated)} />
+        <StatCard label="Activation rate" value={pct(ov.activation_rate)} />
+        <StatCard label="Logins" value={fmtNum(ov.logins)} />
+        <StatCard label="Deletions" value={fmtNum(ov.account_deletions)} warn={ov.account_deletions > 0} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <Card style={{ padding: 18 }}>
+          <h3 style={{ fontSize: 15, marginBottom: 2 }}>Acquisition</h3>
+          <p style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14 }}>By event time, last {days}d</p>
+          <FunnelView stages={fn.acquisition} />
+        </Card>
+        <Card style={{ padding: 18 }}>
+          <h3 style={{ fontSize: 15, marginBottom: 2 }}>Activation (signup cohort)</h3>
+          <p style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14 }}>
+            Signed up in last {days}d · time-to-value {fmtDuration(fn.activation.time_to_value_seconds)} · activation {pct(fn.activation.activation_rate)}
+          </p>
+          <FunnelView stages={fn.activation.stages} />
+        </Card>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+        <Card style={{ padding: 18 }}>
+          <h3 style={{ fontSize: 15, marginBottom: 12 }}>Events</h3>
+          {ev.by_name.length === 0
+            ? <p style={{ color: "#94a3b8", fontSize: 13 }}>No events yet.</p>
+            : ev.by_name.map((r) => listRow(r.event, r.count, true))}
+        </Card>
+        <Card style={{ padding: 18 }}>
+          <h3 style={{ fontSize: 15, marginBottom: 12 }}>Top pages</h3>
+          {ev.top_paths.length === 0
+            ? <p style={{ color: "#94a3b8", fontSize: 13 }}>No page views yet.</p>
+            : ev.top_paths.map((r) => listRow(r.path, r.count))}
+        </Card>
+        <Card style={{ padding: 18 }}>
+          <h3 style={{ fontSize: 15, marginBottom: 12 }}>Top referrers</h3>
+          {ev.top_referrers.length === 0
+            ? <p style={{ color: "#94a3b8", fontSize: 13 }}>Direct / none.</p>
+            : ev.top_referrers.map((r) => listRow(r.referrer, r.count))}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Admin() {
@@ -616,7 +744,7 @@ export default function Admin() {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #e2e8f0", marginBottom: 24 }}>
-        {(["overview", "llm", "feedback", "allowlist", "waitlist", "events", "tasks"] as Tab[]).map((t) => (
+        {(["overview", "analytics", "llm", "feedback", "allowlist", "waitlist", "events", "tasks"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -636,6 +764,7 @@ export default function Admin() {
       </div>
 
       {tab === "overview"  && <OverviewTab />}
+      {tab === "analytics" && <AnalyticsTab />}
       {tab === "llm"       && <LlmTab />}
       {tab === "feedback"  && <FeedbackTab />}
       {tab === "allowlist" && <AllowlistTab />}

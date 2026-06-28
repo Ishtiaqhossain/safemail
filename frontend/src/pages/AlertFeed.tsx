@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { alertsApi } from "@/api/alerts";
 import { AlertBadge } from "@/components/AlertBadge";
 import type { Alert, AlertListResponse } from "@/types";
+import { track } from "@/analytics";
 
 const SEVERITIES = ["critical", "high", "medium", "low"];
 
@@ -49,6 +50,7 @@ export default function AlertFeed() {
   };
 
   useEffect(() => { load(); }, [page, severity, reviewed]);
+  useEffect(() => { track("alerts_viewed"); }, []);
 
   const markReviewed = async (id: string) => {
     await alertsApi.markReviewed(id);

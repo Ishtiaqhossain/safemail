@@ -23,6 +23,7 @@ from app.database import get_db
 from app.ratelimit import limiter, WAITLIST_LIMIT
 from app.models.waitlist_entry import WaitlistEntry
 from app.services.allowlist import normalize_email, is_email_allowed
+from app.services.analytics_events import record_event_async
 
 router = APIRouter(prefix="/waitlist", tags=["waitlist"])
 
@@ -44,6 +45,7 @@ async def join_waitlist(
     # Already invited? They can create an account now — don't park them on the
     # waitlist. Tell the client to route them to registration instead.
     if await is_email_allowed(db, email):
+        await record_event_async(db, "waitlist_already_invited")
         return {"status": "already_invited"}
 
     existing = (await db.execute(
@@ -59,4 +61,7 @@ async def join_waitlist(
         # Concurrent duplicate request — treat as success.
         await db.rollback()
 
+    # Durable top-of-funnel event (waitlist rows are deleted on approval, so the
+    # event is the lasting record of the signup). Source = acquisition channel.
+    await record_event_async(db, "waitlist_joined", properties={"source": body.source or "landing"})
     return {"status": "ok"}
