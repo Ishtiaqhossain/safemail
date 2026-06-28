@@ -43,7 +43,8 @@ def poll_connection(self, connection_id: str):
             provider = get_provider(conn.provider)
             access_token = decrypt_token(conn.access_token)
             refresh_token = decrypt_token(conn.refresh_token)
-            creds, service = provider.build_client(access_token, refresh_token, conn.gmail_address)
+            creds, service = provider.build_client(access_token, refresh_token,
+                                                   conn.gmail_address, conn.token_expiry)
 
             # Let the provider decide whether a refresh is needed (keeps this loop
             # provider-neutral — no Google-specific creds.expired here). Persist and
@@ -54,7 +55,9 @@ def poll_connection(self, connection_id: str):
                 conn.refresh_token = encrypt_token(new_refresh)
                 conn.token_expiry = expiry
                 db.commit()
-                _, service = provider.build_client(new_access, new_refresh, conn.gmail_address)
+                provider.close(service)  # release the client built with the stale token
+                _, service = provider.build_client(new_access, new_refresh,
+                                                   conn.gmail_address, expiry)
 
             message_ids = provider.list_message_ids(service)
             # Dedup is namespaced per connection so message ids from different
@@ -100,15 +103,17 @@ def poll_connection(self, connection_id: str):
             write_task_log(db, "poll_connection", "failure",
                            error=str(exc), duration_ms=timer.elapsed_ms(),
                            meta={"connection_id": connection_id, "auth_failure": is_auth_failure})
+            # Transient (non-auth) failures retry; auth failures wait for reconnect.
+            if not is_auth_failure:
+                raise self.retry(exc=exc, countdown=60)
         finally:
             # Release any persistent connection (IMAP logout); no-op for Gmail.
+            # Runs on success, failure, and before a retry propagates.
             if provider is not None and service is not None:
                 try:
                     provider.close(service)
                 except Exception:
                     pass
-            if not is_auth_failure:
-                raise self.retry(exc=exc, countdown=60)
 
 
 def _notify_reconnect_needed(db, conn: GmailConnection) -> None:

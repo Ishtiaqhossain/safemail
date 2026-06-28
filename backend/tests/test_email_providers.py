@@ -15,6 +15,8 @@ from app.services.email_providers import get_provider, GmailProvider
 from app.services.email_providers.gmail import GmailProvider as GmailProviderImpl
 from app.services.email_providers import apple as apple_mod
 from app.services.email_providers.apple import AppleMailProvider
+from app.services.email_providers import microsoft as ms_mod
+from app.services.email_providers.microsoft import MicrosoftProvider
 from app.services.email_providers.base import ProviderAuthError
 
 
@@ -171,6 +173,119 @@ class TestAppleProvider:
                "uid": "1", "mailbox": "INBOX"}
         d = AppleMailProvider().extract_message_data(raw, "kid@icloud.com", "c", "k")
         assert d["subject"] == "Hello World"
+
+
+def _graph_msg(*, sender: str, to: list[str], cc: list[str] | None = None,
+               subject: str = "Hi", content: str = "<p>hello <b>world</b></p>",
+               content_type: str = "html", msg_id: str = "<abc@outlook.com>") -> dict:
+    return {
+        "id": "AAMkAGI=",
+        "internetMessageId": msg_id,
+        "subject": subject,
+        "from": {"emailAddress": {"address": sender, "name": "Someone"}},
+        "toRecipients": [{"emailAddress": {"address": a}} for a in to],
+        "ccRecipients": [{"emailAddress": {"address": a}} for a in (cc or [])],
+        "receivedDateTime": "2026-06-28T13:00:00Z",
+        "body": {"contentType": content_type, "content": content},
+    }
+
+
+class _FakeResp:
+    def __init__(self, status: int, data: dict):
+        self.status_code = status
+        self._data = data
+
+    def json(self):
+        return self._data
+
+
+class TestMicrosoftProvider:
+    def test_registry_and_auth_kind(self):
+        p = get_provider("microsoft")
+        assert isinstance(p, MicrosoftProvider)
+        assert p.auth_kind == "oauth"
+
+    def test_authorization_url(self, monkeypatch):
+        monkeypatch.setattr(ms_mod.settings, "microsoft_client_id", "cid")
+        monkeypatch.setattr(ms_mod.settings, "microsoft_client_secret", "sec")
+        url = MicrosoftProvider().authorization_url("STATE123", "https://app.example/cb")
+        assert url.startswith("https://login.microsoftonline.com/common/oauth2/v2.0/authorize?")
+        assert "client_id=cid" in url
+        assert "state=STATE123" in url
+        assert "Mail.Read" in url and "offline_access" in url
+
+    def test_authorization_url_unconfigured_raises(self, monkeypatch):
+        from app.services.email_providers.base import ProviderUnavailable
+        monkeypatch.setattr(ms_mod.settings, "microsoft_client_id", "")
+        with pytest.raises(ProviderUnavailable):
+            MicrosoftProvider().authorization_url("s", "https://app/cb")
+
+    def test_extract_message_data_inbound(self):
+        raw = _graph_msg(sender="friend@example.com", to=["kid@outlook.com", "x@y.com"], cc=["cc@y.com"])
+        d = MicrosoftProvider().extract_message_data(raw, "kid@outlook.com", "conn-1", "child-1")
+        assert d["gmail_message_id"] == "<abc@outlook.com>"
+        assert d["gmail_connection_id"] == "conn-1"
+        assert d["child_id"] == "child-1"
+        assert d["direction"] == "inbound"
+        assert d["sender_address"] == "friend@example.com"
+        assert d["recipient_addresses"] == ["kid@outlook.com", "x@y.com", "cc@y.com"]
+        assert d["subject"] == "Hi"
+        assert "hello" in d["body_text"] and "world" in d["body_text"] and "<" not in d["body_text"]
+        assert isinstance(d["received_at"], datetime)
+        assert set(d.keys()) == {
+            "gmail_message_id", "gmail_connection_id", "child_id", "direction",
+            "sender_address", "recipient_addresses", "subject", "body_text", "received_at",
+        }
+
+    def test_extract_outbound_and_plaintext_body(self):
+        raw = _graph_msg(sender="kid@outlook.com", to=["friend@example.com"],
+                         content="plain body", content_type="text")
+        d = MicrosoftProvider().extract_message_data(raw, "kid@outlook.com", "c", "k")
+        assert d["direction"] == "outbound"
+        assert d["body_text"] == "plain body"
+
+    def test_extract_outbound_via_sent_folder_when_address_differs(self):
+        # Work/school account: stored address is the UPN but the message's from
+        # is the primary SMTP — folder must still classify it outbound.
+        raw = _graph_msg(sender="kid@contoso.com", to=["friend@example.com"])
+        raw["_folder"] = "sentitems"
+        d = MicrosoftProvider().extract_message_data(raw, "kid@contoso.onmicrosoft.com", "c", "k")
+        assert d["direction"] == "outbound"
+
+    def test_refresh_skipped_when_token_fresh(self):
+        # expiry well in the future → no token request, returns the same token.
+        from datetime import datetime, timezone, timedelta
+        creds, client = MicrosoftProvider().build_client(
+            "tok", "rt", token_expiry=datetime.now(timezone.utc) + timedelta(hours=1))
+        try:
+            access, refresh, expiry = MicrosoftProvider().refresh_if_needed(creds)
+            assert access == "tok" and refresh == "rt"
+        finally:
+            client.close()
+
+    def test_exchange_code(self, monkeypatch):
+        monkeypatch.setattr(ms_mod.settings, "microsoft_client_id", "cid")
+        monkeypatch.setattr(ms_mod.settings, "microsoft_client_secret", "sec")
+        monkeypatch.setattr(ms_mod.httpx, "post",
+                            lambda url, data=None, timeout=None: _FakeResp(200, {
+                                "access_token": "at", "refresh_token": "rt", "expires_in": 3600}))
+        monkeypatch.setattr(ms_mod.httpx, "get",
+                            lambda url, headers=None, timeout=None: _FakeResp(200, {"mail": "kid@outlook.com"}))
+        access, refresh, expiry, email = MicrosoftProvider().exchange_code("code", "state", "https://app/cb")
+        assert access == "at" and refresh == "rt" and email == "kid@outlook.com"
+        assert isinstance(expiry, datetime)
+
+    def test_refresh_invalid_grant_raises_auth_error(self, monkeypatch):
+        monkeypatch.setattr(ms_mod.settings, "microsoft_client_id", "cid")
+        monkeypatch.setattr(ms_mod.settings, "microsoft_client_secret", "sec")
+        monkeypatch.setattr(ms_mod.httpx, "post",
+                            lambda url, data=None, timeout=None: _FakeResp(400, {"error": "invalid_grant"}))
+        creds, client = MicrosoftProvider().build_client("old", "rt")
+        try:
+            with pytest.raises(ProviderAuthError):
+                MicrosoftProvider().refresh_if_needed(creds)
+        finally:
+            client.close()
 
 
 class TestShimDelegates:

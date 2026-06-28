@@ -21,6 +21,13 @@ export const childrenApi = {
       .then((r) => { window.location.href = r.data.auth_url; });
   },
 
+  // Microsoft (Outlook / Microsoft 365): OAuth redirect via the generic route.
+  connectMicrosoft: (childId: string, returnTo?: string) => {
+    const qs = returnTo ? `&return_to=${encodeURIComponent(returnTo)}` : "";
+    return api.get<{ auth_url: string }>(`/auth/oauth/microsoft/connect?child_id=${childId}${qs}`)
+      .then((r) => { window.location.href = r.data.auth_url; });
+  },
+
   disconnectGmail: (connectionId: string) => api.delete(`/auth/google/${connectionId}`),
 
   // Apple/iCloud (and other credentials-based providers): no OAuth redirect — the

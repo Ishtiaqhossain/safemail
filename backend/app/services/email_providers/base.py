@@ -39,6 +39,10 @@ class EmailProvider(ABC):
     auth_kind: str = "oauth"
 
     # ── OAuth connect flow (override for auth_kind == "oauth") ─────────────────
+    def oauth_redirect_uri(self) -> str:
+        """The provider's registered OAuth redirect URI (from settings)."""
+        raise NotImplementedError(f"{self.name!r} is not an OAuth provider")
+
     def authorization_url(self, state: str, redirect_uri: str) -> str:
         raise NotImplementedError(f"{self.name!r} is not an OAuth provider")
 
@@ -55,8 +59,10 @@ class EmailProvider(ABC):
     # ── Ingestion (all providers implement) ────────────────────────────────────
     @abstractmethod
     def build_client(self, access_token: str, refresh_token: str | None = None,
-                     account_address: str | None = None):
-        """Return ``(credentials, client)`` for the provider's API/connection."""
+                     account_address: str | None = None, token_expiry: datetime | None = None):
+        """Return ``(credentials, client)`` for the provider's API/connection.
+        ``token_expiry`` lets a provider skip an unnecessary refresh; providers
+        that always refresh (or don't expire) may ignore it."""
 
     @abstractmethod
     def refresh_if_needed(self, creds) -> tuple[str, str, datetime]:

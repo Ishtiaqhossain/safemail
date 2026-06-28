@@ -27,7 +27,7 @@ export default function Onboarding() {
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [connectProvider, setConnectProvider] = useState<"google" | "apple">("google");
+  const [connectProvider, setConnectProvider] = useState<"google" | "apple" | "microsoft">("google");
   const [appleEmail, setAppleEmail] = useState("");
   const [applePassword, setApplePassword] = useState("");
 
@@ -95,6 +95,19 @@ export default function Onboarding() {
       // redirect happens; component unmounts
     } catch {
       setError("Couldn't start the Gmail connection. Please try again.");
+      setBusy(false);
+    }
+  };
+
+  const connectMicrosoft = async () => {
+    if (!childId) { setStep(3); return; }
+    track("gmail_connect_initiated", { provider: "microsoft" });
+    setBusy(true); setError(null);
+    try {
+      await childrenApi.connectMicrosoft(childId, "/onboarding?connected=true");
+      // redirect happens; component unmounts
+    } catch {
+      setError("Couldn't start the Microsoft connection. Please try again.");
       setBusy(false);
     }
   };
@@ -211,19 +224,19 @@ export default function Onboarding() {
             <Step title="Connect their email"
                   body="The last step — link the email account you want us to keep an eye on.">
               <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-                {(["google", "apple"] as const).map((p) => (
+                {(["google", "apple", "microsoft"] as const).map((p) => (
                   <button
                     key={p}
                     onClick={() => { setConnectProvider(p); setError(null); }}
                     style={{
-                      flex: 1, padding: "10px 12px", borderRadius: 8, fontSize: 14, fontWeight: 600,
+                      flex: 1, padding: "10px 8px", borderRadius: 8, fontSize: 13, fontWeight: 600,
                       cursor: "pointer",
                       border: connectProvider === p ? "2px solid #2563eb" : "1px solid #e2e8f0",
                       background: connectProvider === p ? "#eff6ff" : "#fff",
                       color: connectProvider === p ? "#1d4ed8" : "#475569",
                     }}
                   >
-                    {p === "google" ? "Gmail" : "Apple Mail (iCloud)"}
+                    {p === "google" ? "Gmail" : p === "apple" ? "Apple Mail" : "Outlook"}
                   </button>
                 ))}
               </div>
@@ -258,6 +271,19 @@ export default function Onboarding() {
                   <input type="password" value={applePassword} onChange={(e) => setApplePassword(e.target.value)}
                          placeholder="xxxx-xxxx-xxxx-xxxx" style={{ width: "100%", marginBottom: 14 }} />
                   <PrimaryBtn onClick={connectApple} disabled={busy}>{busy ? "Connecting…" : "Connect Apple Mail"}</PrimaryBtn>
+                </>
+              )}
+
+              {connectProvider === "microsoft" && (
+                <>
+                  <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 9, padding: "12px 14px", marginBottom: 16 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "#92400e", margin: "0 0 6px" }}>What you'll see on Microsoft's screen</p>
+                    <p style={{ fontSize: 13, color: "#78350f", margin: 0, lineHeight: 1.55 }}>
+                      Microsoft will ask to let SafeMail read mail. That's expected — it's <strong>read-only</strong>,
+                      we never send or delete anything, we never store the email itself, and you can disconnect anytime from Settings.
+                    </p>
+                  </div>
+                  <PrimaryBtn onClick={connectMicrosoft} disabled={busy}>{busy ? "Opening Microsoft…" : "Connect Outlook / Microsoft 365"}</PrimaryBtn>
                 </>
               )}
 

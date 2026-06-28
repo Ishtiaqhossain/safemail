@@ -277,7 +277,7 @@ export default function Settings() {
                           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                             <ConnStatus status={conn.status} />
                             <span style={{ fontSize: 13, color: "#374151" }}>{conn.gmail_address}</span>
-                            <span style={{ fontSize: 11, color: "#94a3b8" }}>{conn.provider === "apple" ? "Apple Mail" : "Gmail"}</span>
+                            <span style={{ fontSize: 11, color: "#94a3b8" }}>{conn.provider === "apple" ? "Apple Mail" : conn.provider === "microsoft" ? "Outlook" : "Gmail"}</span>
                           </div>
                           <button
                             onClick={() => childrenApi.disconnectGmail(conn.id).then(load)}
@@ -295,6 +295,12 @@ export default function Settings() {
                       style={{ padding: "8px 16px", background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", borderRadius: 7, fontSize: 13, fontWeight: 500 }}
                     >
                       + Connect Gmail
+                    </button>
+                    <button
+                      onClick={() => childrenApi.connectMicrosoft(child.id)}
+                      style={{ padding: "8px 16px", background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", borderRadius: 7, fontSize: 13, fontWeight: 500 }}
+                    >
+                      + Connect Outlook / Microsoft 365
                     </button>
                     <AppleConnectForm childId={child.id} onDone={load} />
                   </div>
