@@ -105,7 +105,7 @@ export default function Developer() {
     setPollLoading(true); setPollStatus(null);
     try {
       await devApi.triggerPoll();
-      setPollStatus({ type: "success", message: "Gmail poll queued — check the Celery worker logs" });
+      setPollStatus({ type: "success", message: "Mailbox poll queued — check the Celery worker logs" });
       devApi.queueDepth().then((d) => setQueueDepth(d.pending)).catch(() => {});
     } catch { setPollStatus({ type: "error", message: "Failed to queue poll" }); }
     finally { setPollLoading(false); }
@@ -165,7 +165,7 @@ export default function Developer() {
         <SectionTitle>Pipeline</SectionTitle>
         <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
           <div>
-            <Btn label="Trigger Gmail Poll Now" onClick={handlePoll} loading={pollLoading} />
+            <Btn label="Trigger Mailbox Poll Now" onClick={handlePoll} loading={pollLoading} />
             <p style={{ fontSize: 12, color: "#94a3b8", margin: "5px 0 0" }}>Fires poll_all_connections immediately instead of waiting 5 min.</p>
             <Feedback status={pollStatus} />
           </div>

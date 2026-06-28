@@ -17,8 +17,8 @@ const registerHref = (email: string) =>
 const STEPS = [
   {
     icon: "🔗",
-    title: "Connect their Gmail",
-    body: "A guided, read-only Google sign-in. Takes under five minutes — no apps to install on your child's device, no passwords to share.",
+    title: "Connect their email",
+    body: "A guided, read-only connection — a one-time Google sign-in for Gmail, or an app-specific password for Apple Mail (iCloud). Under five minutes, with no apps to install on your child's device.",
   },
   {
     icon: "🤖",
@@ -65,7 +65,7 @@ const FAQS = [
   },
   {
     q: "Which email providers are supported?",
-    a: "Right now, Gmail and Google Workspace accounts — including school / G Suite for Education addresses — connected with a one-time Google sign-in. Other providers like Outlook, Yahoo, and iCloud aren't supported yet.",
+    a: "Gmail and Google Workspace (including school / G Suite for Education addresses), connected with a one-time Google sign-in, and Apple Mail (iCloud), connected with an app-specific password. We're adding more providers — like Outlook and Yahoo — over time.",
   },
   {
     q: "Will my child know it's there?",

@@ -5,7 +5,7 @@ import { onboardingApi } from "@/api/onboarding";
 import { setOnboardingCompleted } from "@/api/client";
 import { track } from "@/analytics";
 
-const STEP_LABELS = ["Welcome", "How it works", "Consent", "Add child", "Connect Gmail", "Done"];
+const STEP_LABELS = ["Welcome", "How it works", "Consent", "Add child", "Connect email", "Done"];
 export const LS_KEY = "sm_onboarding";
 
 const DETECTION = [
@@ -146,7 +146,7 @@ export default function Onboarding() {
             <Step title="Welcome to SafeMail 👋"
                   body="We watch your child's email for genuinely dangerous content and alert you only when something needs your attention — no noise, no daily digests of nothing.">
               <p style={{ fontSize: 14, color: "#475569", lineHeight: 1.6 }}>
-                This quick setup takes about 2 minutes: you'll add your child and connect their Gmail. Let's go.
+                This quick setup takes about 2 minutes: you'll add your child and connect their email account (Gmail or Apple Mail). Let's go.
               </p>
               <PrimaryBtn onClick={() => setStep(1)}>Get started</PrimaryBtn>
             </Step>

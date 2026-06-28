@@ -139,7 +139,7 @@ export default function Dashboard() {
         <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 18 }}>🛡️</span>
           <span style={{ fontSize: 14, color: "#1e40af", flex: 1 }}>
-            Finish setting up SafeMail — connect a child's Gmail to start monitoring. (Gmail only for now.)
+            Finish setting up SafeMail — connect a child's email account (Gmail or Apple Mail) to start monitoring.
           </span>
           <Link to="/onboarding" style={{ background: "#2563eb", color: "#fff", padding: "5px 14px", borderRadius: 6, fontSize: 13, fontWeight: 500, textDecoration: "none" }}>
             Finish setup
@@ -164,7 +164,7 @@ export default function Dashboard() {
       {/* Stat bar */}
       <div style={{ display: "flex", gap: 14, marginBottom: 28, flexWrap: "wrap" }}>
         <StatCard label="Children" value={children.length} sub="being monitored" accent="#2563eb" />
-        <StatCard label="Active connections" value={activeConns} sub="Gmail accounts" accent="#16a34a" />
+        <StatCard label="Active connections" value={activeConns} sub="Email accounts" accent="#16a34a" />
         <StatCard
           label="Unreviewed alerts"
           value={unreviewedCount}
@@ -205,7 +205,7 @@ export default function Dashboard() {
                   {conn ? (
                     <div style={{ background: "#f8fafc", borderRadius: 7, padding: "8px 10px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                        <p style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>Gmail</p>
+                        <p style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>{conn.provider === "apple" ? "Apple Mail" : "Gmail"}</p>
                         <ConnectionStatus status={conn.status} />
                       </div>
                       <p style={{ fontSize: 12, color: "#374151", wordBreak: "break-all" }}>{conn.gmail_address}</p>
@@ -216,12 +216,12 @@ export default function Dashboard() {
                       )}
                     </div>
                   ) : (
-                    <button
-                      onClick={() => childrenApi.connectGmail(child.id)}
-                      style={{ width: "100%", padding: "7px 0", background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", borderRadius: 7, fontSize: 13, fontWeight: 500, marginTop: 2 }}
+                    <Link
+                      to="/settings"
+                      style={{ display: "block", textAlign: "center", width: "100%", padding: "7px 0", background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", borderRadius: 7, fontSize: 13, fontWeight: 500, marginTop: 2, textDecoration: "none" }}
                     >
-                      + Connect Gmail
-                    </button>
+                      + Connect account
+                    </Link>
                   )}
                 </div>
               );

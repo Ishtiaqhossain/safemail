@@ -284,7 +284,7 @@ async def google_callback(code: str, state: str, db: Annotated[AsyncSession, Dep
         )
     )
     if existing.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Gmail account already connected")
+        raise HTTPException(status_code=409, detail="This email account is already connected")
 
     conn = GmailConnection(
         child_id=child_id,

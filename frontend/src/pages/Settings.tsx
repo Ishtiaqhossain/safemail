@@ -153,7 +153,7 @@ export default function Settings() {
   const deleteAccount = async () => {
     const confirmed = window.prompt(
       "This permanently deletes your account and ALL data — every child, " +
-      "Gmail connection, and alert. This cannot be undone.\n\n" +
+      "email connection, and alert. This cannot be undone.\n\n" +
       'Type DELETE to confirm.'
     );
     if (confirmed !== "DELETE") return;
@@ -439,8 +439,8 @@ export default function Settings() {
         <h2 style={{ marginBottom: 4, fontSize: 15, color: "#dc2626" }}>Delete account</h2>
         <p style={{ color: "#64748b", fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
           Permanently delete your account and all associated data — every child,
-          Gmail connection, and alert. We also revoke SafeMail's access to any
-          connected Gmail accounts. This cannot be undone.
+          email connection, and alert. We also revoke SafeMail's access to any
+          connected email accounts. This cannot be undone.
         </p>
         <button
           onClick={deleteAccount}
