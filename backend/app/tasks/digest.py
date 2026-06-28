@@ -28,6 +28,11 @@ def send_parent_digest(self, parent_id: str):
     from app.config import get_settings
     settings = get_settings()
 
+    # Honor the global transactional-email switch (E2E/CI). Return before marking
+    # any alerts notified, so disabling email doesn't silently drop them.
+    if not settings.transactional_email_enabled:
+        return
+
     now = datetime.now(timezone.utc)
     week_start = (now - timedelta(days=now.weekday() + 1)).date()
 

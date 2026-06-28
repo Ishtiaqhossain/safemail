@@ -23,7 +23,10 @@ export const test = base.extend<{ seed: Seed }>({
     const slug = testInfo.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 28);
     const email = `e2e-${slug}-w${testInfo.workerIndex}-r${testInfo.retry}@example.com`;
 
-    const reset = () => request.post("/v1/dev/reset", { headers: HEADERS, data: { email } });
+    const reset = async () => {
+      const r = await request.post("/v1/dev/reset", { headers: HEADERS, data: { email } });
+      expect(r.ok(), `reset failed: ${r.status()}`).toBeTruthy();
+    };
     await reset();
 
     const seed: Seed = {
