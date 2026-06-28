@@ -42,8 +42,11 @@ def poll_connection(self, connection_id: str):
             refresh_token = decrypt_token(conn.refresh_token)
             creds, service = provider.build_client(access_token, refresh_token)
 
-            if creds.expired:
-                new_access, new_refresh, expiry = provider.refresh_if_needed(creds)
+            # Let the provider decide whether a refresh is needed (keeps this loop
+            # provider-neutral — no Google-specific creds.expired here). Persist and
+            # rebuild only when the tokens actually changed.
+            new_access, new_refresh, expiry = provider.refresh_if_needed(creds)
+            if new_access != access_token:
                 conn.access_token = encrypt_token(new_access)
                 conn.refresh_token = encrypt_token(new_refresh)
                 conn.token_expiry = expiry

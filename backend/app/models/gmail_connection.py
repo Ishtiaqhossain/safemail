@@ -13,7 +13,9 @@ class GmailConnection(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     child_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("children.id", ondelete="CASCADE"), nullable=False)
     # Which email provider this connection is for (see app/services/email_providers).
-    provider: Mapped[str] = mapped_column(String, nullable=False, server_default="google")
+    # Python-side `default` keeps freshly-built (un-refreshed) instances valid;
+    # `server_default` backfills existing rows at migration time.
+    provider: Mapped[str] = mapped_column(String, nullable=False, default="google", server_default="google")
     gmail_address: Mapped[str] = mapped_column(String, nullable=False)
     access_token: Mapped[str] = mapped_column(String, nullable=False)   # encrypted with Fernet
     refresh_token: Mapped[str] = mapped_column(String, nullable=False)  # encrypted with Fernet
