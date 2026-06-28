@@ -95,6 +95,7 @@ export default function Login({ onLogin }: { onLogin?: () => void }) {
           {(["login", "register"] as const).map((m) => (
             <button
               key={m}
+              data-testid={`mode-${m}`}
               onClick={() => setMode(m)}
               style={{
                 flex: 1,
@@ -121,6 +122,7 @@ export default function Login({ onLogin }: { onLogin?: () => void }) {
                 Full name
               </label>
               <input
+                data-testid="login-fullname"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Jane Smith"
@@ -133,6 +135,7 @@ export default function Login({ onLogin }: { onLogin?: () => void }) {
               Email
             </label>
             <input
+              data-testid="login-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -146,6 +149,7 @@ export default function Login({ onLogin }: { onLogin?: () => void }) {
               Password
             </label>
             <input
+              data-testid="login-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -163,13 +167,14 @@ export default function Login({ onLogin }: { onLogin?: () => void }) {
           </div>
 
           {error && (
-            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 7, padding: "9px 12px", color: "#dc2626", fontSize: 13 }}>
+            <div data-testid="login-error" style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 7, padding: "9px 12px", color: "#dc2626", fontSize: 13 }}>
               {error}
             </div>
           )}
 
           <button
             type="submit"
+            data-testid="login-submit"
             disabled={loading}
             style={{
               padding: "10px 0",

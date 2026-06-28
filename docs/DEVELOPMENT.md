@@ -114,6 +114,42 @@ pytest tests/evaluation/test_classifier.py::test_precision_recall_report -v -s
 
 Quality gates: ≥ 85% recall · ≤ 15% false positive rate.
 
+## End-to-end tests (Playwright)
+
+Browser E2E lives in `frontend/e2e/` and drives the real app against a running
+stack. State is created through a **DEBUG-only seed router** (`/v1/dev/*`, mounted
+only when `DEBUG=true` **and** `E2E_SEED_ENABLED=true`, and gated by an
+`X-E2E-Seed-Secret` header) — no OAuth/Gmail/Anthropic/SendGrid calls. CI runs the
+whole thing on every PR (the `e2e` job).
+
+Run it locally on **isolated ports** so it doesn't collide with a normal dev
+server (`:3000`/`:8000`):
+
+```bash
+# 1. Databases (if not already up)
+docker compose up -d postgres redis
+
+# 2. API on :8001 with the E2E seam enabled. Note the explicit DATABASE_URL —
+#    docker-compose creates the `safemail` database (not `openbark`).
+cd backend && source .venv/bin/activate && alembic upgrade head
+DEBUG=true E2E_SEED_ENABLED=true E2E_SEED_SECRET=dev \
+INVITE_ONLY_ENABLED=false RATE_LIMIT_ENABLED=false TRANSACTIONAL_EMAIL_ENABLED=false \
+COOKIE_SECURE=false FRONTEND_URL=http://localhost:3001 \
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/safemail \
+uvicorn app.main:app --port 8001
+
+# 3. Playwright (boots the Vite dev server on :3001, proxying /v1 → :8001)
+cd frontend && npm install
+PORT=3001 VITE_API_TARGET=http://localhost:8001 E2E_SEED_SECRET=dev npm run test:e2e
+#   …or the interactive runner:
+PORT=3001 VITE_API_TARGET=http://localhost:8001 E2E_SEED_SECRET=dev npm run test:e2e:ui
+```
+
+In CI the API runs on the default `:8000` and Playwright uses the defaults
+(`PORT=3000`, `VITE_API_TARGET=http://localhost:8000`), so no overrides are needed.
+The `/v1/dev/*` seam is **never** mounted in production (it requires both
+`DEBUG=true` and `E2E_SEED_ENABLED=true`); `tests/test_dev_seam.py` enforces that.
+
 ## DB Migrations
 
 ```bash

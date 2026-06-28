@@ -16,6 +16,8 @@ CATEGORY_LABELS = {
 
 
 def send_alert_email(parent_email: str, child_name: str, alert: dict) -> None:
+    if not settings.transactional_email_enabled:
+        return
     from sendgrid import SendGridAPIClient
     from sendgrid.helpers.mail import Mail
 
@@ -54,6 +56,8 @@ def send_alert_email(parent_email: str, child_name: str, alert: dict) -> None:
 
 
 def send_verification_email(to_email: str, verify_url: str) -> None:
+    if not settings.transactional_email_enabled:
+        return
     from sendgrid import SendGridAPIClient
     from sendgrid.helpers.mail import Mail
 
@@ -80,6 +84,8 @@ def send_verification_email(to_email: str, verify_url: str) -> None:
 
 
 def send_password_reset_email(to_email: str, reset_url: str) -> None:
+    if not settings.transactional_email_enabled:
+        return
     from sendgrid import SendGridAPIClient
     from sendgrid.helpers.mail import Mail
 
@@ -106,6 +112,8 @@ def send_password_reset_email(to_email: str, reset_url: str) -> None:
 
 
 def send_reconnect_email(to_email: str, child_name: str, gmail_address: str, reconnect_url: str) -> None:
+    if not settings.transactional_email_enabled:
+        return
     from sendgrid import SendGridAPIClient
     from sendgrid.helpers.mail import Mail
 
@@ -148,6 +156,8 @@ def send_health_alert(to_emails, incident: dict, *, resolved: bool = False) -> N
     remediation_status, and a remediation dict. All dynamic values are HTML-escaped
     — the diagnosis is model-generated, so treat it as untrusted (OWASP LLM05).
     """
+    if not settings.transactional_email_enabled:
+        return
     from sendgrid import SendGridAPIClient
     from sendgrid.helpers.mail import Mail
 

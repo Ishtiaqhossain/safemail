@@ -20,8 +20,15 @@ const DETECTION = [
 export default function Onboarding() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const [step, setStep] = useState(0);
-  const [childId, setChildId] = useState<string | null>(null);
+  // Initialize from localStorage lazily (not via an effect) so a mid-wizard
+  // refresh resumes the right step without racing the persistence effect below
+  // (which, under React StrictMode's double-invoke, otherwise clobbered it).
+  const [step, setStep] = useState<number>(() => {
+    try { const s = JSON.parse(localStorage.getItem(LS_KEY) || "{}"); return typeof s.step === "number" ? s.step : 0; } catch { return 0; }
+  });
+  const [childId, setChildId] = useState<string | null>(() => {
+    try { const s = JSON.parse(localStorage.getItem(LS_KEY) || "{}"); return s.childId ?? null; } catch { return null; }
+  });
   const [childName, setChildName] = useState("");
   const [birthYear, setBirthYear] = useState("");
   const [consent, setConsent] = useState(false);
@@ -31,19 +38,14 @@ export default function Onboarding() {
   const [appleEmail, setAppleEmail] = useState("");
   const [applePassword, setApplePassword] = useState("");
 
-  // Resume after the Gmail OAuth round-trip, or from a refresh mid-wizard.
+  // Resume at the "connected" step after the OAuth round-trip. (Mid-wizard refresh
+  // resume is handled by the lazy useState initializers above.)
   useEffect(() => {
     if (params.get("connected") === "true") {
       setStep(5);
       params.delete("connected");
       setParams(params, { replace: true });
-      return;
     }
-    try {
-      const saved = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
-      if (typeof saved.step === "number") setStep(saved.step);
-      if (saved.childId) setChildId(saved.childId);
-    } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
@@ -212,7 +214,7 @@ export default function Onboarding() {
             <Step title="Add your child"
                   body="Who are we helping you keep safe?">
               <label style={lbl}>Child's name or nickname</label>
-              <input value={childName} onChange={(e) => setChildName(e.target.value)} placeholder="e.g. Alex" style={{ width: "100%", marginBottom: 14 }} />
+              <input data-testid="onboarding-child-name" value={childName} onChange={(e) => setChildName(e.target.value)} placeholder="e.g. Alex" style={{ width: "100%", marginBottom: 14 }} />
               <label style={lbl}>Birth year (optional)</label>
               <input value={birthYear} onChange={(e) => setBirthYear(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
                      placeholder="e.g. 2012" inputMode="numeric" style={{ width: "100%" }} />
@@ -309,7 +311,7 @@ export default function Onboarding() {
 
         {step < 5 && (
           <div style={{ textAlign: "center", marginTop: 16 }}>
-            <button onClick={finishLater} disabled={busy} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: 13, cursor: "pointer" }}>
+            <button onClick={finishLater} disabled={busy} data-testid="onboarding-skip" style={{ background: "none", border: "none", color: "#94a3b8", fontSize: 13, cursor: "pointer" }}>
               Skip setup for now
             </button>
           </div>

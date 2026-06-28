@@ -126,6 +126,14 @@ pytest tests/evaluation/test_classifier.py::test_precision_recall_report -v -s
 
 Quality gates: ≥ 85% recall, ≤ 15% false positive rate.
 
+**E2E (Playwright):** browser smoke tests in `frontend/e2e/` drive the real app
+against a running stack; state is created via a DEBUG-only seed router
+(`app/routers/dev.py`, `/v1/dev/*`) gated behind `DEBUG=true` **and**
+`E2E_SEED_ENABLED=true` + an `X-E2E-Seed-Secret` header — no OAuth/AI/email calls.
+Run `cd frontend && npm run test:e2e` (full local recipe + isolated-ports note in
+`docs/DEVELOPMENT.md`). CI runs it on every PR (the `e2e` job); the seam is never
+mounted in prod (`tests/test_dev_seam.py` enforces this).
+
 ## Key environment variables
 
 | Variable | Description |

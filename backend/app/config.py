@@ -43,6 +43,18 @@ class Settings(BaseSettings):
     # (single sender, or any address on an authenticated domain). Override per env.
     email_from: str = "noreply@safemail.com"
 
+    # When False, all transactional email (verification, reset, alerts, digest,
+    # reconnect, health) is skipped — the send_* helpers no-op. Used by E2E/CI so
+    # registration etc. never touch SendGrid. Default True (normal behavior).
+    transactional_email_enabled: bool = True
+
+    # ── E2E test seam (NEVER enable in production) ─────────────────────────────
+    # The /v1/dev/* seed router is mounted only when BOTH debug and e2e_seed_enabled
+    # are true, and every seed request must present e2e_seed_secret. Both default
+    # off so a misconfigured prod with DEBUG=true still doesn't expose seeding.
+    e2e_seed_enabled: bool = False
+    e2e_seed_secret: str = ""
+
     # Production hardening. When False (the production default): Swagger/redoc are
     # disabled, 500s return a generic body instead of the exception text, and
     # startup fails fast if required secrets are missing. Set DEBUG=true locally.
