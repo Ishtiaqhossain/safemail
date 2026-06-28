@@ -27,6 +27,9 @@ export default function Onboarding() {
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connectProvider, setConnectProvider] = useState<"google" | "apple">("google");
+  const [appleEmail, setAppleEmail] = useState("");
+  const [applePassword, setApplePassword] = useState("");
 
   // Resume after the Gmail OAuth round-trip, or from a refresh mid-wizard.
   useEffect(() => {
@@ -92,6 +95,24 @@ export default function Onboarding() {
       // redirect happens; component unmounts
     } catch {
       setError("Couldn't start the Gmail connection. Please try again.");
+      setBusy(false);
+    }
+  };
+
+  const connectApple = async () => {
+    if (!childId) { setStep(3); return; }
+    if (!appleEmail.trim() || !applePassword.trim()) {
+      setError("Enter the iCloud email and the app-specific password.");
+      return;
+    }
+    track("gmail_connect_initiated", { provider: "apple" });
+    setBusy(true); setError(null);
+    try {
+      await childrenApi.connectAppleMail(childId, appleEmail.trim(), applePassword.trim());
+      setStep(5);
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(detail || "Couldn't connect that account. Check the email and app-specific password.");
       setBusy(false);
     }
   };
@@ -187,19 +208,60 @@ export default function Onboarding() {
           )}
 
           {step === 4 && (
-            <Step title="Connect their Gmail"
-                  body="The last step — link the Gmail account you want us to keep an eye on.">
-              <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 9, padding: "12px 14px", marginBottom: 16 }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "#92400e", margin: "0 0 6px" }}>What you'll see on Google's screen</p>
-                <p style={{ fontSize: 13, color: "#78350f", margin: 0, lineHeight: 1.55 }}>
-                  Google will ask to let SafeMail "read your email." That's expected — it's <strong>read-only</strong>,
-                  we never send or delete anything, we never store the email itself, and you can disconnect anytime from Settings.
-                </p>
+            <Step title="Connect their email"
+                  body="The last step — link the email account you want us to keep an eye on.">
+              <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                {(["google", "apple"] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => { setConnectProvider(p); setError(null); }}
+                    style={{
+                      flex: 1, padding: "10px 12px", borderRadius: 8, fontSize: 14, fontWeight: 600,
+                      cursor: "pointer",
+                      border: connectProvider === p ? "2px solid #2563eb" : "1px solid #e2e8f0",
+                      background: connectProvider === p ? "#eff6ff" : "#fff",
+                      color: connectProvider === p ? "#1d4ed8" : "#475569",
+                    }}
+                  >
+                    {p === "google" ? "Gmail" : "Apple Mail (iCloud)"}
+                  </button>
+                ))}
               </div>
-              <PrimaryBtn onClick={connectGmail} disabled={busy}>{busy ? "Opening Google…" : "Connect Gmail"}</PrimaryBtn>
-              <p style={{ fontSize: 12.5, color: "#94a3b8", textAlign: "center", margin: "10px 0 0", lineHeight: 1.5 }}>
-                Only Gmail and Google accounts are supported right now — support for other providers is coming.
-              </p>
+
+              {connectProvider === "google" && (
+                <>
+                  <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 9, padding: "12px 14px", marginBottom: 16 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "#92400e", margin: "0 0 6px" }}>What you'll see on Google's screen</p>
+                    <p style={{ fontSize: 13, color: "#78350f", margin: 0, lineHeight: 1.55 }}>
+                      Google will ask to let SafeMail "read your email." That's expected — it's <strong>read-only</strong>,
+                      we never send or delete anything, we never store the email itself, and you can disconnect anytime from Settings.
+                    </p>
+                  </div>
+                  <PrimaryBtn onClick={connectGmail} disabled={busy}>{busy ? "Opening Google…" : "Connect Gmail"}</PrimaryBtn>
+                </>
+              )}
+
+              {connectProvider === "apple" && (
+                <>
+                  <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 9, padding: "12px 14px", marginBottom: 16 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "#92400e", margin: "0 0 6px" }}>You'll need an app-specific password</p>
+                    <p style={{ fontSize: 13, color: "#78350f", margin: 0, lineHeight: 1.55 }}>
+                      iCloud needs an <strong>app-specific password</strong> (not the Apple ID password). Create one at{" "}
+                      <a href="https://appleid.apple.com" target="_blank" rel="noreferrer" style={{ color: "#92400e", fontWeight: 600 }}>appleid.apple.com</a>{" "}
+                      → Sign-In and Security → App-Specific Passwords. It's read-only and you can disconnect anytime.
+                    </p>
+                  </div>
+                  <label style={lbl}>iCloud email</label>
+                  <input value={appleEmail} onChange={(e) => setAppleEmail(e.target.value)}
+                         placeholder="name@icloud.com" inputMode="email" style={{ width: "100%", marginBottom: 12 }} />
+                  <label style={lbl}>App-specific password</label>
+                  <input type="password" value={applePassword} onChange={(e) => setApplePassword(e.target.value)}
+                         placeholder="xxxx-xxxx-xxxx-xxxx" style={{ width: "100%", marginBottom: 14 }} />
+                  <PrimaryBtn onClick={connectApple} disabled={busy}>{busy ? "Connecting…" : "Connect Apple Mail"}</PrimaryBtn>
+                </>
+              )}
+
+              {error && <p style={{ color: "#dc2626", fontSize: 13, margin: "10px 0 0" }}>{error}</p>}
               <button onClick={() => setStep(5)} style={textBtn}>I'll connect it later</button>
               <BackLink onClick={() => setStep(3)} />
             </Step>

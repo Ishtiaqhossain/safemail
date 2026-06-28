@@ -4,8 +4,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
 from fastapi.responses import RedirectResponse
+from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.config import get_settings
 from app.database import get_db
@@ -21,6 +24,8 @@ from app.auth import (
 )
 from app.services.crypto import encrypt_token, decrypt_token
 from app.services.email_providers import get_provider
+from app.services.email_providers.base import ProviderAuthError, ProviderUnavailable
+from app.services.allowlist import normalize_email
 from app.services import token_denylist
 from app.services.analytics_events import record_event_async
 from app.models.allowed_email import AllowedEmail
@@ -313,6 +318,75 @@ async def disconnect_gmail(
     await db.delete(conn)
     await db.commit()
     await record_event_async(db, "gmail_disconnected", parent_id=current_parent.id)
+
+
+class EmailCredentialsConnect(BaseModel):
+    child_id: uuid.UUID
+    provider: str
+    email: EmailStr
+    app_password: str
+
+
+@router.post("/email/connect", status_code=201)
+async def connect_email_credentials(
+    body: EmailCredentialsConnect,
+    current_parent: Annotated[Parent, Depends(get_current_parent)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Connect a credentials-based mailbox (e.g. Apple/iCloud via an IMAP
+    app-specific password). OAuth providers use /auth/google/connect instead."""
+    result = await db.execute(
+        select(Child).where(Child.id == body.child_id, Child.parent_id == current_parent.id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Child not found")
+
+    try:
+        provider = get_provider(body.provider)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Unknown email provider")
+    if provider.auth_kind != "credentials":
+        raise HTTPException(status_code=400, detail="This provider does not use a password connection")
+
+    address = normalize_email(body.email)
+    # IMAP login is blocking network I/O — run it off the event loop.
+    try:
+        access, refresh, expiry, account_email = await run_in_threadpool(
+            provider.connect_with_credentials, address, body.app_password
+        )
+    except ProviderAuthError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except ProviderUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    existing = await db.execute(
+        select(GmailConnection).where(
+            GmailConnection.child_id == body.child_id,
+            GmailConnection.gmail_address == account_email,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="That account is already connected")
+
+    conn = GmailConnection(
+        child_id=body.child_id,
+        provider=body.provider,
+        gmail_address=account_email,
+        access_token=encrypt_token(access),
+        refresh_token=encrypt_token(refresh),
+        token_expiry=expiry,
+    )
+    db.add(conn)
+    # Guard the unique (child_id, gmail_address) constraint against a concurrent
+    # connect that passed the check above.
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="That account is already connected")
+    await record_event_async(db, "gmail_connected", parent_id=current_parent.id,
+                             properties={"provider": body.provider})
+    return {"status": "connected", "connection_id": str(conn.id)}
 
 
 @router.delete("/account", status_code=204)

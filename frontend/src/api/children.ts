@@ -22,4 +22,16 @@ export const childrenApi = {
   },
 
   disconnectGmail: (connectionId: string) => api.delete(`/auth/google/${connectionId}`),
+
+  // Apple/iCloud (and other credentials-based providers): no OAuth redirect — the
+  // parent supplies the address + an app-specific password.
+  connectAppleMail: (childId: string, email: string, appPassword: string) =>
+    api
+      .post<{ status: string; connection_id: string }>("/auth/email/connect", {
+        child_id: childId,
+        provider: "apple",
+        email,
+        app_password: appPassword,
+      })
+      .then((r) => r.data),
 };

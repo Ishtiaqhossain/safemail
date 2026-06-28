@@ -46,6 +46,63 @@ function ConnStatus({ status }: { status: "active" | "revoked" | "error" }) {
   );
 }
 
+function AppleConnectForm({ childId, onDone }: { childId: string; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        style={{ padding: "8px 16px", background: "#f8fafc", color: "#334155", border: "1px solid #e2e8f0", borderRadius: 7, fontSize: 13, fontWeight: 500 }}
+      >
+        + Connect Apple Mail (iCloud)
+      </button>
+    );
+  }
+
+  const submit = async () => {
+    if (!email.trim() || !pw.trim()) { setErr("Enter the iCloud email and app-specific password."); return; }
+    setBusy(true); setErr(null);
+    try {
+      await childrenApi.connectAppleMail(childId, email.trim(), pw.trim());
+      setOpen(false); setEmail(""); setPw("");
+      onDone();
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setErr(detail || "Couldn't connect that account.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ width: "100%", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: 12 }}>
+      <p style={{ fontSize: 12.5, color: "#64748b", margin: "0 0 8px", lineHeight: 1.5 }}>
+        iCloud needs an <strong>app-specific password</strong> (not your Apple ID password) — create one at{" "}
+        <a href="https://appleid.apple.com" target="_blank" rel="noreferrer">appleid.apple.com</a>. It's read-only.
+      </p>
+      <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@icloud.com" inputMode="email"
+             style={{ width: "100%", marginBottom: 8 }} />
+      <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="app-specific password"
+             style={{ width: "100%", marginBottom: 8 }} />
+      {err && <p style={{ color: "#dc2626", fontSize: 12, margin: "0 0 8px" }}>{err}</p>}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={submit} disabled={busy}
+                style={{ padding: "7px 14px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600 }}>
+          {busy ? "Connecting…" : "Connect"}
+        </button>
+        <button onClick={() => { setOpen(false); setErr(null); }}
+                style={{ padding: "7px 14px", background: "none", color: "#64748b", border: "1px solid #e2e8f0", borderRadius: 6, fontSize: 13 }}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Settings() {
   const [children, setChildren] = useState<Child[]>([]);
   const [newName, setNewName] = useState("");
@@ -210,16 +267,17 @@ export default function Settings() {
                   </button>
                 </div>
 
-                {/* Gmail */}
+                {/* Email accounts */}
                 <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9" }}>
-                  <SectionLabel>Gmail account</SectionLabel>
-                  {child.gmail_connections.length > 0 ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <SectionLabel>Email accounts</SectionLabel>
+                  {child.gmail_connections.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
                       {child.gmail_connections.map((conn) => (
                         <div key={conn.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", borderRadius: 7, padding: "9px 12px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                             <ConnStatus status={conn.status} />
                             <span style={{ fontSize: 13, color: "#374151" }}>{conn.gmail_address}</span>
+                            <span style={{ fontSize: 11, color: "#94a3b8" }}>{conn.provider === "apple" ? "Apple Mail" : "Gmail"}</span>
                           </div>
                           <button
                             onClick={() => childrenApi.disconnectGmail(conn.id).then(load)}
@@ -230,19 +288,16 @@ export default function Settings() {
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <div>
-                      <button
-                        onClick={() => childrenApi.connectGmail(child.id)}
-                        style={{ padding: "8px 16px", background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", borderRadius: 7, fontSize: 13, fontWeight: 500 }}
-                      >
-                        + Connect Gmail account
-                      </button>
-                      <p style={{ fontSize: 12, color: "#94a3b8", margin: "8px 0 0" }}>
-                        We currently support Gmail / Google accounts only.
-                      </p>
-                    </div>
                   )}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    <button
+                      onClick={() => childrenApi.connectGmail(child.id)}
+                      style={{ padding: "8px 16px", background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", borderRadius: 7, fontSize: 13, fontWeight: 500 }}
+                    >
+                      + Connect Gmail
+                    </button>
+                    <AppleConnectForm childId={child.id} onDone={load} />
+                  </div>
                 </div>
 
                 {/* Preferences */}
