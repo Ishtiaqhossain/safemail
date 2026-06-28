@@ -11,7 +11,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import select, func, distinct, and_
+from sqlalchemy import select, func, distinct, literal_column
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
@@ -236,18 +236,22 @@ async def compute_events_breakdown(db: AsyncSession, since: datetime) -> dict:
         .group_by(AnalyticsEvent.referrer).order_by(func.count().desc()).limit(15)
     )).all()
 
-    # Daily page-view + signup timeseries.
+    # Daily page-view + signup timeseries. The truncation unit is a literal (not a
+    # bind param) so the SELECT, GROUP BY, and ORDER BY render as the identical
+    # expression — otherwise asyncpg parameterizes "day" three different ways and
+    # Postgres rejects the GROUP BY as not covering the column.
+    day_expr = func.date_trunc(literal_column("'day'"), AnalyticsEvent.created_at).label("day")
     daily = (await db.execute(
         select(
-            func.date_trunc("day", AnalyticsEvent.created_at).label("day"),
+            day_expr,
             func.count().filter(AnalyticsEvent.event_name == "page_viewed").label("page_views"),
             func.count(distinct(AnalyticsEvent.visitor_id))
                 .filter(AnalyticsEvent.event_name == "page_viewed").label("visitors"),
             func.count().filter(AnalyticsEvent.event_name == "account_registered").label("signups"),
         )
         .where(AnalyticsEvent.created_at >= since)
-        .group_by(func.date_trunc("day", AnalyticsEvent.created_at))
-        .order_by(func.date_trunc("day", AnalyticsEvent.created_at))
+        .group_by(day_expr)
+        .order_by(day_expr)
     )).all()
 
     return {

@@ -15,7 +15,8 @@ from app.models.gmail_connection import GmailConnection
 from app.models.alert import Alert
 from app.models.analytics_event import AnalyticsEvent
 from app.services.analytics_events import (
-    compute_activation_funnel, compute_acquisition_funnel, record_event_async,
+    compute_activation_funnel, compute_acquisition_funnel, compute_events_breakdown,
+    record_event_async,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -150,3 +151,25 @@ async def test_acquisition_funnel_from_events(db):
     assert stages["visitors"] == 2      # distinct visitor_id on page_viewed
     assert stages["waitlist"] == 1
     assert stages["registered"] == 1
+
+
+async def test_events_breakdown(db):
+    # Regression: the daily timeseries GROUP BY must not crash on Postgres.
+    db.add(AnalyticsEvent(event_name="page_viewed", visitor_id="v1", source="client", path="/"))
+    db.add(AnalyticsEvent(event_name="page_viewed", visitor_id="v2", source="client", path="/login",
+                          referrer="https://google.com"))
+    db.add(AnalyticsEvent(event_name="account_registered", visitor_id="server", source="server"))
+    await db.commit()
+
+    since = datetime.now(timezone.utc) - timedelta(days=30)
+    result = await compute_events_breakdown(db, since)
+
+    by_name = {r["event"]: r["count"] for r in result["by_name"]}
+    assert by_name["page_viewed"] == 2
+    assert by_name["account_registered"] == 1
+    paths = {r["path"]: r["count"] for r in result["top_paths"]}
+    assert paths["/"] == 1 and paths["/login"] == 1
+    assert any(r["referrer"] == "https://google.com" for r in result["top_referrers"])
+    # Daily timeseries returns at least one bucket and doesn't raise.
+    assert len(result["daily"]) >= 1
+    assert result["daily"][0]["page_views"] == 2
