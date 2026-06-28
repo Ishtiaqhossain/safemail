@@ -36,7 +36,8 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 ```
 
 You'll also need your existing **Google OAuth client ID/secret**, **Anthropic API
-key**, and **SendGrid key**.
+key**, and **SendGrid key** (and, optionally, a **Microsoft Entra app
+ID/secret** to offer Outlook / Microsoft 365 — see Step 5).
 
 > After pasting the keys into Railway, delete `prod_private.pem` /
 > `prod_public.pem` — they shouldn't sit on disk.
@@ -152,6 +153,32 @@ Services -> Credentials -> your OAuth client**:
   `https://<frontend-domain>/v1/auth/google/callback`
 - **Authorized JavaScript origins**: add `https://<frontend-domain>`
 
+### Microsoft (Outlook / Microsoft 365) — optional
+
+Skip this if you only want Gmail + Apple; the app boots fine without it and the
+"Outlook / Microsoft 365" connect option errors clearly until it's configured.
+
+1. In the [Microsoft Entra admin center](https://entra.microsoft.com) ->
+   **Identity -> Applications -> App registrations -> New registration**:
+   - **Supported account types**: *Accounts in any organizational directory and
+     personal Microsoft accounts* (this is the `common` tenant — covers school
+     M365 **and** personal Outlook.com).
+   - **Redirect URI**: platform **Web**, value
+     `https://<frontend-domain>/v1/auth/oauth/microsoft/callback`.
+2. **Certificates & secrets -> New client secret** -> copy the secret **value**
+   (not the id).
+3. **API permissions -> Add a permission -> Microsoft Graph -> Delegated**: add
+   `Mail.Read`, `User.Read`, `offline_access`, `openid`, `email`. (Admin consent
+   isn't required for personal accounts; for a school tenant the tenant admin may
+   need to grant it.)
+4. Add to Railway **shared variables** (or the api service):
+   ```
+   MICROSOFT_CLIENT_ID=<application (client) id>
+   MICROSOFT_CLIENT_SECRET=<client secret value>
+   MICROSOFT_REDIRECT_URI=https://<frontend-domain>/v1/auth/oauth/microsoft/callback
+   ```
+   The redirect URI must match the one registered in step 1 exactly.
+
 ## Step 6 — Deploy in the right order
 
 Deploy **api first** (so the frontend's nginx can resolve it on boot), then
@@ -166,6 +193,7 @@ Against `https://<frontend-domain>`:
 - Register an account -> succeeds (the first account bypasses the invite gate).
 - Log in -> dashboard loads (JWT signs/verifies from env keys; same-origin cookie).
 - Add a child -> "Connect Gmail" -> Google OAuth completes back to your domain.
+  (If Microsoft is configured, "Connect Outlook / Microsoft 365" likewise.)
 - (Once PR3's domain email is set up) the verification email arrives, not in spam.
 
 ## Step 8 — Make yourself the first admin
