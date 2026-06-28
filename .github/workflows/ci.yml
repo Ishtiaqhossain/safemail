@@ -72,6 +72,7 @@ jobs:
           tests/test_email_providers.py
           tests/test_auth.py
           tests/test_alerts.py
+          tests/test_waitlist.py
           tests/test_dev_seam.py
           tests/evaluation/test_pipeline.py
 
