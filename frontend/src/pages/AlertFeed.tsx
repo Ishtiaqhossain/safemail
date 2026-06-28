@@ -116,6 +116,7 @@ export default function AlertFeed() {
               {response.data.map((alert: Alert) => (
                 <tr
                   key={alert.id}
+                  data-testid="alert-row"
                   style={{ background: alert.reviewed_at ? "#fff" : "#fffbf5" }}
                 >
                   {/* Severity color bar */}

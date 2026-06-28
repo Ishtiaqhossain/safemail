@@ -102,6 +102,7 @@ export function NavBar() {
           <div style={{ width: 1, height: 20, background: "#e2e8f0", margin: "0 4px" }} />
           <button
             onClick={logout}
+            data-testid="logout"
             style={{ background: "none", border: "1px solid #e2e8f0", color: "#64748b", padding: "5px 14px", borderRadius: 6, fontSize: 13 }}
           >
             Sign out

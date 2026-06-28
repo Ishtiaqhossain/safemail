@@ -201,6 +201,7 @@ export default function Settings() {
                 Name <span style={{ color: "#dc2626" }}>*</span>
               </label>
               <input
+                data-testid="settings-child-name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Emma"
@@ -222,6 +223,7 @@ export default function Settings() {
               <button
                 type="submit"
                 disabled={addLoading}
+                data-testid="settings-add-child"
                 style={{ padding: "8px 20px", background: "#2563eb", color: "#fff", borderRadius: 7, fontWeight: 600 }}
               >
                 {addLoading ? "Adding…" : "Add child"}
@@ -314,7 +316,7 @@ export default function Settings() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                       <SectionLabel>Alert preferences</SectionLabel>
                       {savedPrefId === child.id && (
-                        <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 500 }}>✓ Saved</span>
+                        <span data-testid="prefs-saved" style={{ fontSize: 12, color: "#16a34a", fontWeight: 500 }}>✓ Saved</span>
                       )}
                     </div>
 

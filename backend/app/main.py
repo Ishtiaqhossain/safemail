@@ -62,6 +62,12 @@ app.include_router(waitlist.router, prefix=API_PREFIX)
 app.include_router(monitoring.router, prefix=API_PREFIX)
 app.include_router(analytics.router, prefix=API_PREFIX)
 
+# E2E seed router — mounted ONLY when explicitly enabled for tests (never in prod).
+# Double-gated: debug AND e2e_seed_enabled, plus a per-request secret in the router.
+if settings.debug and settings.e2e_seed_enabled:
+    from app.routers import dev
+    app.include_router(dev.router, prefix=API_PREFIX)
+
 
 @app.get("/health")
 async def health():

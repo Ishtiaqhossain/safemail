@@ -255,7 +255,7 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {recentAlerts.map((alert) => (
-                  <tr key={alert.id} style={{ background: alert.reviewed_at ? "#fff" : "#fffbf5" }}>
+                  <tr key={alert.id} data-testid="recent-alert" style={{ background: alert.reviewed_at ? "#fff" : "#fffbf5" }}>
                     <td style={{ paddingLeft: 20 }}><AlertBadge severity={alert.severity} /></td>
                     <td style={{ color: "#374151" }}>{alert.child_name}</td>
                     <td style={{ color: "#64748b", fontSize: 13 }}>{CATEGORY_LABELS[alert.category] ?? alert.category}</td>

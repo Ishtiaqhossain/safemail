@@ -226,6 +226,7 @@ export default function AlertDetail() {
           <button
             onClick={() => submitFeedback("correct")}
             disabled={feedbackSaved}
+            data-testid="feedback-correct"
             style={{
               flex: 1, padding: "10px 12px", borderRadius: 6, cursor: feedbackSaved ? "default" : "pointer",
               border: feedback === "correct" ? "2px solid #16a34a" : "2px solid #e5e7eb",

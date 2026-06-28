@@ -24,6 +24,12 @@ node_modules/
 dist/
 .DS_Store
 
+# Playwright (E2E)
+playwright-report/
+test-results/
+.playwright/
+blob-report/
+
 # Alembic
 alembic/versions/*.pyc
 
