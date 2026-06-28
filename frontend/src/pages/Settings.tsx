@@ -81,10 +81,12 @@ function AppleConnectForm({ childId, onDone }: { childId: string; onDone: () => 
   return (
     <div style={{ width: "100%", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: 12 }}>
       <p style={{ fontSize: 12.5, color: "#64748b", margin: "0 0 8px", lineHeight: 1.5 }}>
-        iCloud needs an <strong>app-specific password</strong> (not your Apple ID password) — create one at{" "}
+        Enter the child's <strong>iCloud mailbox</strong> — an <strong>@icloud.com</strong> (or
+        @me.com / @mac.com) address, not a Gmail address. iCloud needs an{" "}
+        <strong>app-specific password</strong> (not the Apple ID password) — create one at{" "}
         <a href="https://appleid.apple.com" target="_blank" rel="noreferrer">appleid.apple.com</a>. It's read-only.
       </p>
-      <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@icloud.com" inputMode="email"
+      <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="child@icloud.com" inputMode="email"
              style={{ width: "100%", marginBottom: 8 }} />
       <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="app-specific password"
              style={{ width: "100%", marginBottom: 8 }} />
