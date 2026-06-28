@@ -201,20 +201,30 @@ alembic downgrade -1
 ## Inbound email providers
 
 Inbound monitoring is provider-agnostic behind a Strategy interface in
-`app/services/email_providers/` (`base.py` defines `EmailProvider`; `gmail.py` is the
-only implementation today; `__init__.py` exposes `get_provider(name)`). The ingestion
-loop (`app/tasks/ingestion.py`) and the OAuth routes (`app/routers/auth.py`) dispatch
-through `get_provider(conn.provider)`. The connection row carries a `provider` column
-(default `"google"`). **Note:** the table/columns/`message_data` keys still use the
-legacy `gmail_*` names (and the UI still says "Gmail") — a deliberate deferral; the
-provider-neutral rename + provider-picker UI land with the first non-Gmail provider.
+`app/services/email_providers/` (`base.py` defines `EmailProvider`; `gmail.py` =
+Google/OAuth, `apple.py` = Apple/iCloud over IMAP; `__init__.py` exposes
+`get_provider(name)`). The ingestion loop (`app/tasks/ingestion.py`) dispatches
+through `get_provider(conn.provider)`; the connection row carries a `provider`
+column (default `"google"`).
 
-### Adding an email provider (future)
-1. Implement `EmailProvider` in `app/services/email_providers/<name>.py` (OAuth +
-   ingestion methods); `extract_message_data` MUST return the canonical dict shape.
+Two auth models (`provider.auth_kind`): **oauth** (Gmail — `/auth/google/connect`
++ callback) and **credentials** (Apple — the parent supplies the iCloud address +
+an app-specific password to `POST /auth/email/connect`; the password is stored
+Fernet-encrypted, IMAP is read-only via EXAMINE + BODY.PEEK). The frontend connect
+step (Onboarding + Settings) has a provider picker.
+
+**Note:** the table/columns/`message_data` keys still use the legacy `gmail_*`
+names (e.g. `gmail_connections.gmail_address`, `gmail_message_id`) — a deliberate
+deferral; they're just identifiers. A provider-neutral rename is future cleanup.
+
+### Adding an email provider
+1. Implement `EmailProvider` in `app/services/email_providers/<name>.py` — set
+   `auth_kind`, implement the connect method for that kind (OAuth or
+   `connect_with_credentials`) + the ingestion methods. `extract_message_data` MUST
+   return the canonical dict shape.
 2. Register it in `app/services/email_providers/__init__.py` `_PROVIDERS`.
-3. Generalize the OAuth routes to a provider param (currently hard-wired to `google`)
-   and add the provider-picker UI + provider-neutral renames.
+3. Wire the connect UI (reuse `/auth/email/connect` for credentials providers; add a
+   route for new OAuth providers) and add it to the frontend provider picker.
 
 ## Adding a new detection category
 

@@ -40,7 +40,7 @@ def poll_connection(self, connection_id: str):
             provider = get_provider(conn.provider)
             access_token = decrypt_token(conn.access_token)
             refresh_token = decrypt_token(conn.refresh_token)
-            creds, service = provider.build_client(access_token, refresh_token)
+            creds, service = provider.build_client(access_token, refresh_token, conn.gmail_address)
 
             # Let the provider decide whether a refresh is needed (keeps this loop
             # provider-neutral — no Google-specific creds.expired here). Persist and
@@ -51,7 +51,7 @@ def poll_connection(self, connection_id: str):
                 conn.refresh_token = encrypt_token(new_refresh)
                 conn.token_expiry = expiry
                 db.commit()
-                _, service = provider.build_client(new_access, new_refresh)
+                _, service = provider.build_client(new_access, new_refresh, conn.gmail_address)
 
             message_ids = provider.list_message_ids(service)
             new_ids = [mid for mid in message_ids if not _redis.exists(f"dedup:{mid}")]
@@ -79,7 +79,12 @@ def poll_connection(self, connection_id: str):
 
         except Exception as exc:
             logger.error("Poll failed for connection %s: %s", connection_id, exc)
-            is_auth_failure = "invalid_grant" in str(exc).lower() or "401" in str(exc)
+            exc_l = str(exc).lower()
+            is_auth_failure = (
+                "invalid_grant" in exc_l or "401" in exc_l
+                or "authenticationfailed" in exc_l or "invalid credentials" in exc_l
+                or "login failed" in exc_l
+            )
             if is_auth_failure:
                 conn.status = "error"
                 db.commit()
